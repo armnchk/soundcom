@@ -9,7 +9,9 @@ import {
   insertRatingSchema, 
   insertCommentSchema,
   insertCommentReactionSchema,
-  insertReportSchema
+  insertReportSchema,
+  insertCollectionSchema,
+  insertCollectionReleaseSchema
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -501,6 +503,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching user comments:", error);
       res.status(500).json({ message: "Failed to fetch user comments" });
+    }
+  });
+
+  // Collection routes
+  app.get('/api/collections', async (req, res) => {
+    try {
+      const activeOnly = req.query.activeOnly !== 'false';
+      const collections = await storage.getCollections(activeOnly);
+      res.json(collections);
+    } catch (error) {
+      console.error("Error fetching collections:", error);
+      res.status(500).json({ message: "Failed to fetch collections" });
+    }
+  });
+
+  app.get('/api/collections/:id', async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const collection = await storage.getCollection(id);
+      
+      if (!collection) {
+        return res.status(404).json({ message: "Collection not found" });
+      }
+      
+      res.json(collection);
+    } catch (error) {
+      console.error("Error fetching collection:", error);
+      res.status(500).json({ message: "Failed to fetch collection" });
+    }
+  });
+
+  app.post('/api/collections', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const validatedData = insertCollectionSchema.parse(req.body);
+      const collection = await storage.createCollection(validatedData);
+      res.status(201).json(collection);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid collection data", errors: error.errors });
+      }
+      console.error("Error creating collection:", error);
+      res.status(500).json({ message: "Failed to create collection" });
+    }
+  });
+
+  app.put('/api/collections/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      const validatedData = insertCollectionSchema.partial().parse(req.body);
+      const collection = await storage.updateCollection(id, validatedData);
+      res.json(collection);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid collection data", errors: error.errors });
+      }
+      console.error("Error updating collection:", error);
+      res.status(500).json({ message: "Failed to update collection" });
+    }
+  });
+
+  app.delete('/api/collections/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      await storage.deleteCollection(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting collection:", error);
+      res.status(500).json({ message: "Failed to delete collection" });
+    }
+  });
+
+  app.post('/api/collections/:id/releases', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const collectionId = parseInt(req.params.id);
+      const { releaseId, sortOrder } = req.body;
+
+      if (!releaseId) {
+        return res.status(400).json({ message: "Release ID is required" });
+      }
+
+      const collectionRelease = await storage.addReleaseToCollection(collectionId, releaseId, sortOrder);
+      res.status(201).json(collectionRelease);
+    } catch (error) {
+      console.error("Error adding release to collection:", error);
+      res.status(500).json({ message: "Failed to add release to collection" });
+    }
+  });
+
+  app.delete('/api/collections/:id/releases/:releaseId', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const collectionId = parseInt(req.params.id);
+      const releaseId = parseInt(req.params.releaseId);
+
+      await storage.removeReleaseFromCollection(collectionId, releaseId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing release from collection:", error);
+      res.status(500).json({ message: "Failed to remove release from collection" });
+    }
+  });
+
+  app.put('/api/collections/:id/releases/:releaseId/sort', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const collectionId = parseInt(req.params.id);
+      const releaseId = parseInt(req.params.releaseId);
+      const { sortOrder } = req.body;
+
+      if (typeof sortOrder !== 'number') {
+        return res.status(400).json({ message: "Sort order must be a number" });
+      }
+
+      await storage.updateCollectionReleaseSortOrder(collectionId, releaseId, sortOrder);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error updating sort order:", error);
+      res.status(500).json({ message: "Failed to update sort order" });
     }
   });
 

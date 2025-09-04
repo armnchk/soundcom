@@ -6,6 +6,8 @@ import {
   comments,
   commentReactions,
   reports,
+  collections,
+  collectionReleases,
   type User,
   type UpsertUser,
   type Artist,
@@ -14,12 +16,16 @@ import {
   type Comment,
   type CommentReaction,
   type Report,
+  type Collection,
+  type CollectionRelease,
   type InsertArtist,
   type InsertRelease,
   type InsertRating,
   type InsertComment,
   type InsertCommentReaction,
   type InsertReport,
+  type InsertCollection,
+  type InsertCollectionRelease,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, or, ilike } from "drizzle-orm";
@@ -73,6 +79,16 @@ export interface IStorage {
   // User profile operations
   getUserRatings(userId: string): Promise<(Rating & { release: Release & { artist: Artist } })[]>;
   getUserComments(userId: string): Promise<(Comment & { release: Release & { artist: Artist } })[]>;
+  
+  // Collection operations
+  getCollections(activeOnly?: boolean): Promise<(Collection & { releases: (Release & { artist: Artist })[] })[]>;
+  getCollection(id: number): Promise<(Collection & { releases: (Release & { artist: Artist })[] }) | undefined>;
+  createCollection(collection: InsertCollection): Promise<Collection>;
+  updateCollection(id: number, collection: Partial<InsertCollection>): Promise<Collection>;
+  deleteCollection(id: number): Promise<void>;
+  addReleaseToCollection(collectionId: number, releaseId: number, sortOrder?: number): Promise<CollectionRelease>;
+  removeReleaseFromCollection(collectionId: number, releaseId: number): Promise<void>;
+  updateCollectionReleaseSortOrder(collectionId: number, releaseId: number, sortOrder: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -517,6 +533,128 @@ export class DatabaseStorage implements IStorage {
         artist: row.artist
       }
     })) as (Comment & { release: Release & { artist: Artist } })[];
+  }
+
+  // Collection operations
+  async getCollections(activeOnly = true): Promise<(Collection & { releases: (Release & { artist: Artist })[] })[]> {
+    const query = db
+      .select({
+        collection: collections,
+        release: releases,
+        artist: artists,
+        sortOrder: collectionReleases.sortOrder,
+      })
+      .from(collections)
+      .leftJoin(collectionReleases, eq(collections.id, collectionReleases.collectionId))
+      .leftJoin(releases, eq(collectionReleases.releaseId, releases.id))
+      .leftJoin(artists, eq(releases.artistId, artists.id))
+      .orderBy(collections.sortOrder, collectionReleases.sortOrder);
+
+    if (activeOnly) {
+      query.where(eq(collections.isActive, true));
+    }
+
+    const result = await query;
+    
+    // Group by collection
+    const collectionsMap = new Map<number, Collection & { releases: (Release & { artist: Artist })[] }>();
+    
+    for (const row of result) {
+      if (!collectionsMap.has(row.collection.id)) {
+        collectionsMap.set(row.collection.id, {
+          ...row.collection,
+          releases: []
+        });
+      }
+      
+      if (row.release && row.artist) {
+        collectionsMap.get(row.collection.id)!.releases.push({
+          ...row.release,
+          artist: row.artist
+        });
+      }
+    }
+    
+    return Array.from(collectionsMap.values());
+  }
+
+  async getCollection(id: number): Promise<(Collection & { releases: (Release & { artist: Artist })[] }) | undefined> {
+    const result = await db
+      .select({
+        collection: collections,
+        release: releases,
+        artist: artists,
+        sortOrder: collectionReleases.sortOrder,
+      })
+      .from(collections)
+      .leftJoin(collectionReleases, eq(collections.id, collectionReleases.collectionId))
+      .leftJoin(releases, eq(collectionReleases.releaseId, releases.id))
+      .leftJoin(artists, eq(releases.artistId, artists.id))
+      .where(eq(collections.id, id))
+      .orderBy(collectionReleases.sortOrder);
+
+    if (result.length === 0) return undefined;
+
+    const collectionData = result[0].collection;
+    const releasesData = result
+      .filter(row => row.release && row.artist)
+      .map(row => ({
+        ...row.release!,
+        artist: row.artist!
+      }));
+
+    return {
+      ...collectionData,
+      releases: releasesData
+    };
+  }
+
+  async createCollection(collection: InsertCollection): Promise<Collection> {
+    const [created] = await db
+      .insert(collections)
+      .values(collection)
+      .returning();
+    return created;
+  }
+
+  async updateCollection(id: number, collection: Partial<InsertCollection>): Promise<Collection> {
+    const [updated] = await db
+      .update(collections)
+      .set({ ...collection, updatedAt: new Date() })
+      .where(eq(collections.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCollection(id: number): Promise<void> {
+    await db.delete(collections).where(eq(collections.id, id));
+  }
+
+  async addReleaseToCollection(collectionId: number, releaseId: number, sortOrder = 0): Promise<CollectionRelease> {
+    const [created] = await db
+      .insert(collectionReleases)
+      .values({ collectionId, releaseId, sortOrder })
+      .returning();
+    return created;
+  }
+
+  async removeReleaseFromCollection(collectionId: number, releaseId: number): Promise<void> {
+    await db
+      .delete(collectionReleases)
+      .where(and(
+        eq(collectionReleases.collectionId, collectionId),
+        eq(collectionReleases.releaseId, releaseId)
+      ));
+  }
+
+  async updateCollectionReleaseSortOrder(collectionId: number, releaseId: number, sortOrder: number): Promise<void> {
+    await db
+      .update(collectionReleases)
+      .set({ sortOrder })
+      .where(and(
+        eq(collectionReleases.collectionId, collectionId),
+        eq(collectionReleases.releaseId, releaseId)
+      ));
   }
 }
 

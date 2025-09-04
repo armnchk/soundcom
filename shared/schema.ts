@@ -9,6 +9,7 @@ import {
   integer,
   boolean,
   serial,
+  unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
@@ -93,6 +94,27 @@ export const reports = pgTable("reports", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const collections = pgTable("collections", {
+  id: serial("id").primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: varchar("subtitle", { length: 255 }),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const collectionReleases = pgTable("collection_releases", {
+  id: serial("id").primaryKey(),
+  collectionId: integer("collection_id").references(() => collections.id, { onDelete: "cascade" }).notNull(),
+  releaseId: integer("release_id").references(() => releases.id, { onDelete: "cascade" }).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  addedAt: timestamp("added_at").defaultNow(),
+}, (table) => ({
+  uniqueCollectionRelease: unique().on(table.collectionId, table.releaseId),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   ratings: many(ratings),
@@ -112,6 +134,7 @@ export const releasesRelations = relations(releases, ({ one, many }) => ({
   }),
   ratings: many(ratings),
   comments: many(comments),
+  collectionReleases: many(collectionReleases),
 }));
 
 export const ratingsRelations = relations(ratings, ({ one }) => ({
@@ -160,6 +183,21 @@ export const reportsRelations = relations(reports, ({ one }) => ({
   }),
 }));
 
+export const collectionsRelations = relations(collections, ({ many }) => ({
+  collectionReleases: many(collectionReleases),
+}));
+
+export const collectionReleasesRelations = relations(collectionReleases, ({ one }) => ({
+  collection: one(collections, {
+    fields: [collectionReleases.collectionId],
+    references: [collections.id],
+  }),
+  release: one(releases, {
+    fields: [collectionReleases.releaseId],
+    references: [releases.id],
+  }),
+}));
+
 // Schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -199,6 +237,17 @@ export const insertReportSchema = createInsertSchema(reports).omit({
   createdAt: true,
 });
 
+export const insertCollectionSchema = createInsertSchema(collections).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCollectionReleaseSchema = createInsertSchema(collectionReleases).omit({
+  id: true,
+  addedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -208,6 +257,8 @@ export type Rating = typeof ratings.$inferSelect;
 export type Comment = typeof comments.$inferSelect;
 export type CommentReaction = typeof commentReactions.$inferSelect;
 export type Report = typeof reports.$inferSelect;
+export type Collection = typeof collections.$inferSelect;
+export type CollectionRelease = typeof collectionReleases.$inferSelect;
 
 export type InsertArtist = z.infer<typeof insertArtistSchema>;
 export type InsertRelease = z.infer<typeof insertReleaseSchema>;
@@ -215,3 +266,5 @@ export type InsertRating = z.infer<typeof insertRatingSchema>;
 export type InsertComment = z.infer<typeof insertCommentSchema>;
 export type InsertCommentReaction = z.infer<typeof insertCommentReactionSchema>;
 export type InsertReport = z.infer<typeof insertReportSchema>;
+export type InsertCollection = z.infer<typeof insertCollectionSchema>;
+export type InsertCollectionRelease = z.infer<typeof insertCollectionReleaseSchema>;
