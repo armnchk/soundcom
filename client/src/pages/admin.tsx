@@ -502,10 +502,20 @@ function MusicImportTab() {
       throw new Error('Invalid import data');
     },
     onSuccess: (result) => {
+      const successCount = result.success || 0;
+      const errorCount = result.errors?.length || 0;
+      const skippedCount = result.skipped || 0;
+      
       toast({
-        title: "Импорт завершен",
-        description: `Импортировано ${result.success} релизов. ${result.errors.length > 0 ? `${result.errors.length} ошибок.` : ''}`,
+        title: "Импорт завершен!",
+        description: `✅ Добавлено: ${successCount} релизов${errorCount > 0 ? ` | ❌ Ошибок: ${errorCount}` : ''}${skippedCount > 0 ? ` | ⏭️ Пропущено: ${skippedCount}` : ''}`,
       });
+      
+      // Показать подробные результаты
+      if (result.errors && result.errors.length > 0) {
+        console.log('Ошибки импорта:', result.errors);
+      }
+      
       setArtistList('');
       setYearsList('');
       queryClient.invalidateQueries({ queryKey: ["/api/admin/import/stats"] });
@@ -577,14 +587,26 @@ function MusicImportTab() {
               <Database className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold text-foreground">Статистика базы данных</h3>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-4 bg-secondary/50 rounded-lg">
-                <p className="text-2xl font-bold text-primary">{stats.totalReleases}</p>
-                <p className="text-sm text-muted-foreground">Всего релизов</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.realReleases || 0}</p>
+                <p className="text-sm text-muted-foreground">Реальные релизы</p>
+                <p className="text-xs text-green-600 dark:text-green-400 mt-1">Импортированные</p>
               </div>
-              <div className="text-center p-4 bg-secondary/50 rounded-lg">
-                <p className="text-2xl font-bold text-primary">{stats.totalArtists}</p>
+              <div className="text-center p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.testReleases || 0}</p>
+                <p className="text-sm text-muted-foreground">Тестовые релизы</p>
+                <p className="text-xs text-orange-600 dark:text-orange-400 mt-1">Для демо</p>
+              </div>
+              <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.totalReleases}</p>
+                <p className="text-sm text-muted-foreground">Всего релизов</p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">В базе данных</p>
+              </div>
+              <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{stats.totalArtists}</p>
                 <p className="text-sm text-muted-foreground">Всего артистов</p>
+                <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">Уникальных</p>
               </div>
             </div>
           </CardContent>

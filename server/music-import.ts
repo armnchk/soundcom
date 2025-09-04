@@ -377,12 +377,15 @@ export class MassImportService {
   /**
    * Получить статистику импорта
    */
-  async getImportStats(): Promise<{ totalReleases: number; totalArtists: number }> {
-    const releases = await storage.getReleases({});
+  async getImportStats(): Promise<{ totalReleases: number; realReleases: number; testReleases: number; totalArtists: number }> {
+    const allReleases = await storage.getReleases({ includeTestData: true });
+    const realReleases = await storage.getReleases({ includeTestData: false });
     const artists = await storage.getArtists();
     
     return {
-      totalReleases: releases.length,
+      totalReleases: allReleases.length,
+      realReleases: realReleases.length,
+      testReleases: allReleases.length - realReleases.length,
       totalArtists: artists.length
     };
   }
