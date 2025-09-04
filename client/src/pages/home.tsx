@@ -193,7 +193,7 @@ export default function Home() {
                             </p>
                             <div className="flex items-center mt-1">
                               <span className="text-xs font-medium text-foreground">
-                                {release.averageRating ? release.averageRating.toFixed(1) : '0.0'}
+                                {Number(release.averageRating || 0).toFixed(1)}
                               </span>
                               <span className="text-xs text-muted-foreground ml-1">★</span>
                             </div>

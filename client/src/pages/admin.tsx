@@ -922,7 +922,7 @@ function ReleaseBrowserTab({
                     </p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1">
                       <span>{release.releaseDate ? new Date(release.releaseDate).getFullYear() : 'Нет даты'}</span>
-                      <span>★ {release.averageRating ? release.averageRating.toFixed(1) : '0.0'}</span>
+                      <span>★ {Number(release.averageRating || 0).toFixed(1)}</span>
                       <span>{release.commentCount || 0} отзывов</span>
                       {release.isTestData && (
                         <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 rounded text-xs">
