@@ -223,7 +223,7 @@ export default function Home() {
                     
                     <div className="flex flex-col items-end space-y-1">
                       <div className="text-sm">
-                        <span className="font-semibold text-foreground">{release.averageRating.toFixed(1)}</span>
+                        <span className="font-semibold text-foreground">{Number(release.averageRating || 0).toFixed(1)}</span>
                         <span className="text-muted-foreground">/10</span>
                       </div>
                       <span className="text-xs text-muted-foreground flex items-center">
