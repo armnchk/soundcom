@@ -174,7 +174,7 @@ export default function Landing() {
       </section>
 
       {/* New Releases Carousel */}
-      <section className="py-32 relative bg-white">
+      <section className="py-32 relative">
         <div className="flowing-orb blue morphing-shape w-72 h-72 -top-10 -right-20" style={{animationDelay: '5s'}} />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -282,7 +282,7 @@ export default function Landing() {
       </section>
 
       {/* Top Rated Carousel */}
-      <section className="py-32 bg-gray-50/50 relative">
+      <section className="py-32 relative">
         <div className="flowing-orb gray wave-animation w-80 h-80 -bottom-10 -left-20" style={{animationDelay: '2s'}} />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -395,7 +395,7 @@ export default function Landing() {
       </section>
 
       {/* Footer CTA */}
-      <section className="py-40 relative bg-white">
+      <section className="py-40 relative">
         <div className="flowing-orb blue morphing-shape w-96 h-96 top-10 left-1/2 -translate-x-1/2" style={{animationDelay: '10s'}} />
         
         <div className="max-w-5xl mx-auto text-center px-4 sm:px-6 lg:px-8">
