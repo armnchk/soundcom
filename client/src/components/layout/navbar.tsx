@@ -36,7 +36,7 @@ export default function Navbar() {
               <div className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center">
                 <Music className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold text-foreground">MusicReview</span>
+              <span className="text-xl font-bold text-foreground">RevYou</span>
             </a>
           </Link>
 
@@ -47,7 +47,7 @@ export default function Navbar() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search albums, artists, songs..."
+                placeholder="Поиск релизов, исполнителей..."
                 className="pl-10 bg-input border-border focus:ring-2 focus:ring-ring"
                 data-testid="input-search"
               />
@@ -119,7 +119,7 @@ export default function Navbar() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search music..."
+            placeholder="Поиск музыки..."
             className="pl-10 bg-input border-border"
             data-testid="input-search-mobile"
           />

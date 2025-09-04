@@ -11,10 +11,10 @@ export default function Footer() {
               <div className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center">
                 <Music className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold text-foreground">MusicReview</span>
+              <span className="text-xl font-bold text-foreground">RevYou</span>
             </div>
             <p className="text-muted-foreground text-sm">
-              The ultimate platform for music discovery and community reviews.
+              Современная платформа для оценки и обсуждения музыкальных релизов.
             </p>
           </div>
           
