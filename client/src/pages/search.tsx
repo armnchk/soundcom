@@ -47,11 +47,11 @@ export default function Search() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Search Header */}
         <div className="mb-8 text-center">
-          <h1 className="text-3xl font-bold text-foreground mb-4">Search Music</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-4">Поиск музыки</h1>
           <div className="max-w-2xl mx-auto">
             <SearchBar 
               onSearch={handleSearch}
-              placeholder="Search albums, artists, songs..."
+              placeholder="Найти альбомы, артистов, песни..."
               className="w-full"
             />
           </div>
@@ -61,9 +61,9 @@ export default function Search() {
         {query.length > 2 ? (
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-6">
-              {isLoading ? 'Searching...' : `Search Results for "${query}"`}
+              {isLoading ? 'Ищем...' : `Результаты поиска для "${query}"`}
               {!isLoading && searchResults.length > 0 && (
-                <span className="text-muted-foreground ml-2">({searchResults.length} found)</span>
+                <span className="text-muted-foreground ml-2">({searchResults.length} найдено)</span>
               )}
             </h2>
 
@@ -91,9 +91,9 @@ export default function Search() {
               <Card>
                 <CardContent className="p-12 text-center">
                   <SearchIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-foreground mb-2">No Results Found</h3>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Ничего не найдено</h3>
                   <p className="text-muted-foreground">
-                    We couldn't find any releases matching "{query}". Try different keywords or check the spelling.
+                    Мы не смогли найти релизы, соответствующие "{query}". Попробуйте другие ключевые слова или проверьте правописание.
                   </p>
                 </CardContent>
               </Card>
@@ -103,9 +103,9 @@ export default function Search() {
           <Card>
             <CardContent className="p-12 text-center">
               <SearchIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-foreground mb-2">Start Searching</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-2">Начните поиск</h3>
               <p className="text-muted-foreground">
-                Enter at least 3 characters to search for albums, artists, or songs.
+                Введите минимум 3 символа для поиска альбомов, артистов или песен.
               </p>
             </CardContent>
           </Card>

@@ -14,7 +14,7 @@ interface SearchBarProps {
 export function SearchBar({ 
   onSearch, 
   onResults, 
-  placeholder = "Search albums, artists, songs...",
+  placeholder = "Найти альбомы, артистов, песни...",
   className 
 }: SearchBarProps) {
   const [query, setQuery] = useState("");
@@ -36,7 +36,7 @@ export function SearchBar({
     queryFn: async ({ queryKey }) => {
       const [, params] = queryKey as [string, { q: string }];
       const response = await fetch(`/api/search?q=${encodeURIComponent(params.q)}`);
-      if (!response.ok) throw new Error('Search failed');
+      if (!response.ok) throw new Error('Поиск не удался');
       return response.json();
     },
   });

@@ -26,6 +26,8 @@ export default function Release() {
   const queryClient = useQueryClient();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
   const [userRating, setUserRating] = useState(0);
+  const [commentText, setCommentText] = useState("");
+  const [commentRating, setCommentRating] = useState(0);
 
   const releaseId = parseInt(id || '0');
 
@@ -79,6 +81,52 @@ export default function Release() {
       });
     },
   });
+
+  const commentMutation = useMutation({
+    mutationFn: async (data: { text: string; rating?: number }) => {
+      await apiRequest('POST', `/api/releases/${releaseId}/comments`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/releases/${releaseId}/comments`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/releases/${releaseId}`] });
+      setCommentText("");
+      setCommentRating(0);
+      toast({ title: "Отзыв опубликован!" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Не авторизован",
+          description: "Вы не авторизованы. Выполняется вход...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Ошибка",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCommentSubmit = () => {
+    if (!commentText.trim()) {
+      toast({
+        title: "Ошибка",
+        description: "Введите текст комментария",
+        variant: "destructive",
+      });
+      return;
+    }
+    commentMutation.mutate({
+      text: commentText,
+      rating: commentRating || undefined,
+    });
+  };
 
   const handleRatingSubmit = (newRating: number) => {
     setUserRating(newRating);
@@ -251,6 +299,8 @@ export default function Release() {
                         placeholder="Поделитесь своими впечатлениями о релизе..."
                         className="min-h-[120px]"
                         data-testid="input-comment"
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
                       />
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-2">
@@ -260,13 +310,22 @@ export default function Release() {
                               key={star}
                               className="p-1 hover:bg-muted rounded"
                               data-testid={`button-comment-star-${star}`}
+                              onClick={() => setCommentRating(star)}
                             >
-                              <Star className="w-4 h-4 text-muted-foreground hover:text-yellow-500 hover:fill-current" />
+                              <Star className={`w-4 h-4 ${
+                                star <= commentRating
+                                  ? 'text-yellow-500 fill-current'
+                                  : 'text-muted-foreground hover:text-yellow-500 hover:fill-current'
+                              }`} />
                             </button>
                           ))}
                         </div>
-                        <Button data-testid="button-submit-comment">
-                          Опубликовать
+                        <Button 
+                          data-testid="button-submit-comment"
+                          onClick={handleCommentSubmit}
+                          disabled={commentMutation.isPending || !commentText.trim()}
+                        >
+                          {commentMutation.isPending ? "Отправляем..." : "Опубликовать"}
                         </Button>
                       </div>
                     </div>

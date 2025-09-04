@@ -31,8 +31,8 @@ export default function Admin() {
   useEffect(() => {
     if (!authLoading && (!user || !user.isAdmin)) {
       toast({
-        title: "Unauthorized",
-        description: "You don't have permission to access the admin panel.",
+        title: "Не авторизован",
+        description: "У вас нет прав доступа к админ-панели.",
         variant: "destructive",
       });
       setTimeout(() => {
@@ -82,12 +82,12 @@ export default function Admin() {
         appleMusicUrl: ''
       });
       queryClient.invalidateQueries({ queryKey: ["/api/releases"] });
-      toast({ title: "Release added successfully!" });
+      toast({ title: "Релиз успешно добавлен!" });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
+          title: "Не авторизован",
           description: "You are logged out. Logging in again...",
           variant: "destructive",
         });
@@ -97,7 +97,7 @@ export default function Admin() {
         return;
       }
       toast({ 
-        title: "Failed to add release", 
+        title: "Ошибка добавления релиза", 
         description: error.message,
         variant: "destructive" 
       });
@@ -110,12 +110,12 @@ export default function Admin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/reports"] });
-      toast({ title: "Comment deleted successfully" });
+      toast({ title: "Комментарий успешно удален" });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
+          title: "Не авторизован",
           description: "You are logged out. Logging in again...",
           variant: "destructive",
         });
@@ -125,7 +125,7 @@ export default function Admin() {
         return;
       }
       toast({ 
-        title: "Failed to delete comment", 
+        title: "Ошибка удаления комментария", 
         description: error.message,
         variant: "destructive" 
       });
@@ -138,12 +138,12 @@ export default function Admin() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/reports"] });
-      toast({ title: "Report resolved" });
+      toast({ title: "Жалоба закрыта" });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
+          title: "Не авторизован",
           description: "You are logged out. Logging in again...",
           variant: "destructive",
         });
@@ -153,7 +153,7 @@ export default function Admin() {
         return;
       }
       toast({ 
-        title: "Failed to resolve report", 
+        title: "Ошибка закрытия жалобы", 
         description: error.message,
         variant: "destructive" 
       });
@@ -210,7 +210,7 @@ export default function Admin() {
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
             <Shield className="w-6 h-6 text-primary" />
-            <h1 className="text-3xl font-bold text-foreground">Admin Panel</h1>
+            <h1 className="text-3xl font-bold text-foreground">Админ-панель</h1>
           </div>
           <p className="text-muted-foreground">Manage releases, reports, and users</p>
         </div>
@@ -229,7 +229,7 @@ export default function Admin() {
             onClick={() => setActiveTab('reports')}
             data-testid="tab-reports"
           >
-            Reported Comments
+            Жалобы на комменты
             {reports.length > 0 && (
               <span className="ml-2 bg-destructive text-destructive-foreground rounded-full px-2 py-0.5 text-xs">
                 {reports.length}
@@ -254,7 +254,7 @@ export default function Admin() {
               <form onSubmit={handleReleaseSubmit} className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
-                    <Label htmlFor="title">Release Title *</Label>
+                    <Label htmlFor="title">Название релиза *</Label>
                     <Input
                       id="title"
                       value={releaseForm.title}
@@ -266,7 +266,7 @@ export default function Admin() {
                   </div>
                   
                   <div>
-                    <Label htmlFor="artist">Artist Name *</Label>
+                    <Label htmlFor="artist">Имя артиста *</Label>
                     <Input
                       id="artist"
                       value={releaseForm.artistName}
@@ -278,7 +278,7 @@ export default function Admin() {
                   </div>
                   
                   <div>
-                    <Label htmlFor="date">Release Date *</Label>
+                    <Label htmlFor="date">Дата релиза *</Label>
                     <Input
                       id="date"
                       type="date"
@@ -309,14 +309,14 @@ export default function Admin() {
                       type="url"
                       value={releaseForm.spotifyUrl}
                       onChange={(e) => setReleaseForm(prev => ({ ...prev, spotifyUrl: e.target.value }))}
-                      placeholder="Spotify URL"
+                      placeholder="Ссылка Spotify"
                       data-testid="input-spotify"
                     />
                     <Input
                       type="url"
                       value={releaseForm.appleMusicUrl}
                       onChange={(e) => setReleaseForm(prev => ({ ...prev, appleMusicUrl: e.target.value }))}
-                      placeholder="Apple Music URL"
+                      placeholder="Ссылка Apple Music"
                       data-testid="input-apple-music"
                     />
                   </div>
@@ -328,7 +328,7 @@ export default function Admin() {
                   className="bg-primary text-primary-foreground hover:bg-primary/90"
                   data-testid="button-add-release"
                 >
-                  {addReleaseMutation.isPending ? "Adding..." : "Add Release"}
+                  {addReleaseMutation.isPending ? "Добавляем..." : "Добавить релиз"}
                 </Button>
               </form>
             </CardContent>
@@ -340,7 +340,7 @@ export default function Admin() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-foreground flex items-center">
               <AlertTriangle className="mr-2 text-destructive" />
-              Pending Reports ({reports.length})
+              Новые жалобы ({reports.length})
             </h3>
 
             {reports.length === 0 ? (
@@ -355,9 +355,9 @@ export default function Admin() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <span className="font-medium text-foreground text-sm">Reported Comment</span>
+                        <span className="font-medium text-foreground text-sm">Жалоба на коммент</span>
                         <span className="text-xs text-muted-foreground ml-2">
-                          Report #{report.id}
+                          Жалоба #{report.id}
                         </span>
                       </div>
                       <span className="text-xs text-destructive font-medium">
@@ -378,7 +378,7 @@ export default function Admin() {
                     
                     {report.reason && (
                       <div className="mb-4">
-                        <p className="text-xs text-muted-foreground mb-1">Report reason:</p>
+                        <p className="text-xs text-muted-foreground mb-1">Причина жалобы:</p>
                         <p className="text-sm text-foreground">{report.reason}</p>
                       </div>
                     )}
@@ -392,7 +392,7 @@ export default function Admin() {
                         data-testid={`button-delete-comment-${report.id}`}
                       >
                         <Trash2 className="w-4 h-4 mr-1" />
-                        Delete Comment
+                        Удалить коммент
                       </Button>
                       <Button
                         variant="secondary"
@@ -402,7 +402,7 @@ export default function Admin() {
                         data-testid={`button-dismiss-report-${report.id}`}
                       >
                         <X className="w-4 h-4 mr-1" />
-                        Dismiss Report
+                        Отменить жалобу
                       </Button>
                     </div>
                   </CardContent>

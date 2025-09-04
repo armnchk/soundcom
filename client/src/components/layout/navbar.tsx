@@ -31,13 +31,11 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/">
-            <a className="flex items-center space-x-2" data-testid="link-home">
-              <div className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center">
-                <Music className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold text-foreground">RevYou</span>
-            </a>
+          <Link href="/" className="flex items-center space-x-2" data-testid="link-home">
+            <div className="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center">
+              <Music className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="text-xl font-bold text-foreground">RevYou</span>
           </Link>
 
           {/* Search Bar */}
@@ -76,20 +74,16 @@ export default function Navbar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem asChild>
-                    <Link href={`/profile/${user?.id}`}>
-                      <a className="flex items-center" data-testid="link-profile">
-                        <User className="w-4 h-4 mr-2" />
-                        Профиль
-                      </a>
+                    <Link href={`/profile/${user?.id}`} className="flex items-center" data-testid="link-profile">
+                      <User className="w-4 h-4 mr-2" />
+                      Профиль
                     </Link>
                   </DropdownMenuItem>
                   {user?.isAdmin && (
                     <DropdownMenuItem asChild>
-                      <Link href="/admin">
-                        <a className="flex items-center" data-testid="link-admin">
-                          <Shield className="w-4 h-4 mr-2" />
-                          Админ панель
-                        </a>
+                      <Link href="/admin" className="flex items-center" data-testid="link-admin">
+                        <Shield className="w-4 h-4 mr-2" />
+                        Админ панель
                       </Link>
                     </DropdownMenuItem>
                   )}

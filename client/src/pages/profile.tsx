@@ -26,8 +26,8 @@ export default function Profile() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
+        title: "Не авторизован",
+        description: "Вы вышли из системы. Выполняется вход...",
         variant: "destructive",
       });
       setTimeout(() => {
@@ -56,7 +56,7 @@ export default function Profile() {
       <div className="min-h-screen bg-background">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground">Loading profile...</div>
+          <div className="animate-pulse text-muted-foreground">Загрузка профиля...</div>
         </div>
         <Footer />
       </div>
@@ -70,11 +70,11 @@ export default function Profile() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
           <Card>
             <CardContent className="p-12 text-center">
-              <h1 className="text-2xl font-bold text-foreground mb-2">User Not Found</h1>
-              <p className="text-muted-foreground mb-4">The user profile you're looking for doesn't exist.</p>
+              <h1 className="text-2xl font-bold text-foreground mb-2">Пользователь не найден</h1>
+              <p className="text-muted-foreground mb-4">Профиль пользователя, который вы ищете, не существует.</p>
               <Button onClick={() => setLocation("/")} data-testid="button-go-home">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Go Home
+                На главную
               </Button>
             </CardContent>
           </Card>
@@ -108,21 +108,21 @@ export default function Profile() {
                 {user.nickname || user.firstName || 'User'}
               </h1>
               <p className="text-muted-foreground">
-                Joined {new Date(user.createdAt).toLocaleDateString('en-US', { 
+                Присоединился {user.createdAt ? new Date(user.createdAt).toLocaleDateString('ru-RU', { 
                   year: 'numeric', 
                   month: 'long' 
-                })}
+                }) : 'недавно'}
               </p>
               <div className="flex items-center space-x-4 mt-2">
                 <span className="text-sm text-muted-foreground">
                   <span className="font-semibold text-foreground" data-testid="text-total-ratings">
                     {userRatings.length}
-                  </span> Ratings
+                  </span> Оценок
                 </span>
                 <span className="text-sm text-muted-foreground">
                   <span className="font-semibold text-foreground" data-testid="text-total-comments">
                     {userComments.length}
-                  </span> Reviews
+                  </span> Отзывов
                 </span>
               </div>
             </div>
@@ -153,7 +153,7 @@ export default function Profile() {
                 onClick={() => setActiveTab('reviews')}
                 data-testid="tab-reviews"
               >
-                Reviews
+                Отзывы
               </Button>
             </nav>
           </div>
@@ -203,7 +203,7 @@ export default function Profile() {
               {userRatings.length === 0 && (
                 <Card>
                   <CardContent className="p-12 text-center">
-                    <p className="text-muted-foreground">No ratings yet.</p>
+                    <p className="text-muted-foreground">Оценок пока нет.</p>
                   </CardContent>
                 </Card>
               )}
@@ -259,7 +259,7 @@ export default function Profile() {
               {userComments.length === 0 && (
                 <Card>
                   <CardContent className="p-12 text-center">
-                    <p className="text-muted-foreground">No reviews yet.</p>
+                    <p className="text-muted-foreground">Отзывов пока нет.</p>
                   </CardContent>
                 </Card>
               )}
