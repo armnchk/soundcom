@@ -169,7 +169,7 @@ export default function Release() {
                 {/* Average Rating Display */}
                 <Card>
                   <CardContent className="p-4">
-                    <h3 className="text-sm font-semibold text-foreground mb-2">Community Rating</h3>
+                    <h3 className="text-sm font-semibold text-foreground mb-2">Рейтинг сообщества</h3>
                     <div className="flex items-center space-x-3">
                       <span className="text-3xl font-bold text-primary" data-testid="text-average-rating">
                         {Number(release.averageRating || 0).toFixed(1)}
@@ -177,7 +177,7 @@ export default function Release() {
                       <div>
                         <StarRating rating={Number(release.averageRating || 0)} maxRating={10} size="sm" />
                         <p className="text-xs text-muted-foreground mt-1">
-                          Based on community ratings
+                          На основе оценок сообщества
                         </p>
                       </div>
                     </div>
@@ -193,10 +193,10 @@ export default function Release() {
                         onRatingChange={handleRatingSubmit}
                         maxRating={10}
                         size="md"
-                        label="Your Rating"
+                        label="Ваша оценка"
                       />
                       {ratingMutation.isPending && (
-                        <p className="text-xs text-muted-foreground mt-2">Saving rating...</p>
+                        <p className="text-xs text-muted-foreground mt-2">Сохраняем оценку...</p>
                       )}
                     </CardContent>
                   </Card>
@@ -205,7 +205,7 @@ export default function Release() {
                 {/* Streaming Links */}
                 {(streamingLinks.spotify || streamingLinks.appleMusic) && (
                   <div className="space-y-2">
-                    <h3 className="text-sm font-semibold text-foreground">Listen On</h3>
+                    <h3 className="text-sm font-semibold text-foreground">Слушать на</h3>
                     <div className="flex flex-col space-y-2">
                       {streamingLinks.spotify && (
                         <Button
