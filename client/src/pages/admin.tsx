@@ -975,8 +975,10 @@ function CollectionsTab() {
     isActive: true,
     sortOrder: 0
   });
+  const [selectedReleases, setSelectedReleases] = useState<any[]>([]);
   const [releaseSearch, setReleaseSearch] = useState('');
   const [managingReleases, setManagingReleases] = useState<number | null>(null);
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
 
   // Fetch collections
   const { data: collections, isLoading: collectionsLoading } = useQuery({
@@ -1080,10 +1082,35 @@ function CollectionsTab() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Валидация
+    if (!collectionForm.title.trim()) {
+      toast({ 
+        title: "Ошибка валидации", 
+        description: "Название подборки обязательно",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    if (selectedReleases.length < 5) {
+      toast({ 
+        title: "Ошибка валидации", 
+        description: "Выберите минимум 5 релизов для подборки",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    const collectionData = {
+      ...collectionForm,
+      releaseIds: selectedReleases.map(r => r.id)
+    };
+    
     if (editingCollection) {
-      updateCollectionMutation.mutate({ id: editingCollection.id, data: collectionForm });
+      updateCollectionMutation.mutate({ id: editingCollection.id, data: collectionData });
     } else {
-      createCollectionMutation.mutate(collectionForm);
+      createCollectionMutation.mutate(collectionData);
     }
   };
 
@@ -1096,6 +1123,7 @@ function CollectionsTab() {
       isActive: collection.isActive,
       sortOrder: collection.sortOrder
     });
+    setSelectedReleases(collection.releases || []);
     setIsCreating(true);
   };
 
@@ -1103,6 +1131,48 @@ function CollectionsTab() {
     setEditingCollection(null);
     setIsCreating(false);
     setCollectionForm({ title: '', subtitle: '', description: '', isActive: true, sortOrder: 0 });
+    setSelectedReleases([]);
+  };
+
+  // Функции для управления выбранными релизами
+  const toggleReleaseSelection = (release: any) => {
+    setSelectedReleases(prev => {
+      const isSelected = prev.some(r => r.id === release.id);
+      if (isSelected) {
+        return prev.filter(r => r.id !== release.id);
+      } else {
+        return [...prev, release];
+      }
+    });
+  };
+
+  // Drag & Drop функции
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedItem(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedItem === null) return;
+
+    const newReleases = [...selectedReleases];
+    const draggedRelease = newReleases[draggedItem];
+    
+    newReleases.splice(draggedItem, 1);
+    newReleases.splice(dropIndex, 0, draggedRelease);
+    
+    setSelectedReleases(newReleases);
+    setDraggedItem(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
   };
 
   const filteredReleases = allReleases?.filter((release: any) =>
@@ -1151,18 +1221,22 @@ function CollectionsTab() {
             <h4 className="text-lg font-semibold mb-4">
               {editingCollection ? 'Редактировать подборку' : 'Создать новую подборку'}
             </h4>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Basic Collection Info */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="title">Название</Label>
+                  <Label htmlFor="title">Название *</Label>
                   <Input
                     id="title"
                     value={collectionForm.title}
                     onChange={(e) => setCollectionForm(prev => ({ ...prev, title: e.target.value }))}
                     placeholder="Название подборки"
-                    required
+                    className={!collectionForm.title.trim() ? "border-red-300" : ""}
                     data-testid="input-collection-title"
                   />
+                  {!collectionForm.title.trim() && (
+                    <p className="text-xs text-red-500 mt-1">Название обязательно</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="subtitle">Подзаголовок</Label>
@@ -1175,6 +1249,7 @@ function CollectionsTab() {
                   />
                 </div>
               </div>
+              
               <div>
                 <Label htmlFor="description">Описание</Label>
                 <Textarea
@@ -1186,6 +1261,7 @@ function CollectionsTab() {
                   data-testid="textarea-collection-description"
                 />
               </div>
+              
               <div className="flex items-center gap-4">
                 <div className="flex items-center space-x-2">
                   <input
@@ -1204,18 +1280,130 @@ function CollectionsTab() {
                     type="number"
                     value={collectionForm.sortOrder}
                     onChange={(e) => setCollectionForm(prev => ({ ...prev, sortOrder: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
                     className="w-20"
                     data-testid="input-collection-sort-order"
                   />
                 </div>
               </div>
-              <div className="flex gap-2">
+
+              {/* Release Selection */}
+              <div className="border-t pt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <Label className="text-base font-medium">
+                    Выбор релизов * (минимум 5)
+                  </Label>
+                  <div className="text-sm text-muted-foreground">
+                    Выбрано: {selectedReleases.length} / 5 мин.
+                    {selectedReleases.length < 5 && (
+                      <span className="text-red-500 ml-2">Нужно выбрать ещё {5 - selectedReleases.length}</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Selected Releases with Drag & Drop */}
+                {selectedReleases.length > 0 && (
+                  <div className="mb-4">
+                    <h6 className="text-sm font-medium mb-2">Выбранные релизы (перетаскивайте для изменения порядка):</h6>
+                    <div className="space-y-2 max-h-48 overflow-y-auto border rounded p-2">
+                      {selectedReleases.map((release, index) => (
+                        <div
+                          key={release.id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, index)}
+                          onDragOver={handleDragOver}
+                          onDrop={(e) => handleDrop(e, index)}
+                          onDragEnd={handleDragEnd}
+                          className={`flex items-center justify-between p-3 bg-primary/5 border rounded cursor-move transition-all 
+                            ${draggedItem === index ? 'opacity-50' : 'hover:bg-primary/10'}`}
+                          data-testid={`selected-release-${release.id}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="text-xs font-medium text-muted-foreground w-6">
+                              #{index + 1}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{release.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {release.artist?.name} • {release.releaseDate ? new Date(release.releaseDate).getFullYear() : 'Нет даты'}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleReleaseSelection(release)}
+                            data-testid={`button-remove-selected-${release.id}`}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Available Releases */}
+                <div>
+                  <h6 className="text-sm font-medium mb-2">Доступные релизы:</h6>
+                  <Input
+                    placeholder="Поиск релизов..."
+                    value={releaseSearch}
+                    onChange={(e) => setReleaseSearch(e.target.value)}
+                    className="mb-2"
+                    data-testid="input-search-releases-form"
+                  />
+                  <div className="max-h-64 overflow-y-auto border rounded">
+                    {(releaseSearch ? 
+                      allReleases?.filter((release: any) =>
+                        (release.title.toLowerCase().includes(releaseSearch.toLowerCase()) ||
+                         release.artist?.name.toLowerCase().includes(releaseSearch.toLowerCase())) &&
+                        !selectedReleases.some(sr => sr.id === release.id)
+                      ) || [] :
+                      allReleases?.filter((release: any) => 
+                        !selectedReleases.some(sr => sr.id === release.id)
+                      )?.slice(0, 20) || []
+                    ).map((release: any) => (
+                      <div
+                        key={release.id}
+                        className="flex items-center p-3 hover:bg-muted/50 border-b last:border-b-0 cursor-pointer"
+                        onClick={() => toggleReleaseSelection(release)}
+                        data-testid={`available-release-${release.id}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedReleases.some(r => r.id === release.id)}
+                          onChange={() => {}} // Controlled by parent onClick
+                          className="mr-3"
+                          data-testid={`checkbox-release-${release.id}`}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-sm">{release.title}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {release.artist?.name} • {release.releaseDate ? new Date(release.releaseDate).getFullYear() : 'Нет даты'}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2 pt-4 border-t">
                 <Button
                   type="submit"
-                  disabled={createCollectionMutation.isPending || updateCollectionMutation.isPending}
-                  data-testid="button-submit-collection"
+                  disabled={
+                    createCollectionMutation.isPending || 
+                    updateCollectionMutation.isPending ||
+                    !collectionForm.title.trim() ||
+                    selectedReleases.length < 5
+                  }
+                  data-testid="button-save-collection"
                 >
-                  {editingCollection ? 'Обновить' : 'Создать'}
+                  {createCollectionMutation.isPending || updateCollectionMutation.isPending 
+                    ? "Сохраняем..." 
+                    : (editingCollection ? "Обновить" : "Создать")}
                 </Button>
                 <Button
                   type="button"
