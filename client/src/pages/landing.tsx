@@ -83,8 +83,8 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div></div>
-            <h1 className="text-3xl font-semibold text-foreground tracking-[0.15em] text-glow">
-              RevYou
+            <h1 className="text-3xl font-bold text-foreground tracking-[0.2em] text-shadow-sm">
+              Rev<span className="text-primary">You</span>
             </h1>
             <Button 
               onClick={handleSignIn}
@@ -99,18 +99,20 @@ export default function Landing() {
 
       {/* Hero Section with Abstract Background */}
       <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden">
-        {/* Animated Abstract Background */}
+        {/* Abstract Background with Blue/Black/Gray Elements */}
         <div className="absolute inset-0">
-          {/* Morphing blobs */}
-          <div className="flowing-orb morphing-shape w-96 h-96 top-10 left-10 opacity-30" />
-          <div className="flowing-orb morphing-shape w-80 h-80 bottom-20 right-20 opacity-20" style={{animationDelay: '7s'}} />
-          <div className="flowing-orb wave-animation w-64 h-64 top-1/2 left-1/4 opacity-25" style={{animationDelay: '3s'}} />
+          {/* Morphing blobs in different colors */}
+          <div className="flowing-orb blue morphing-shape w-96 h-96 top-10 left-10" />
+          <div className="flowing-orb gray morphing-shape w-80 h-80 bottom-20 right-20" style={{animationDelay: '7s'}} />
+          <div className="flowing-orb dark wave-animation w-64 h-64 top-1/2 left-1/4" style={{animationDelay: '3s'}} />
+          <div className="flowing-orb blue morphing-shape w-72 h-72 bottom-10 left-1/3" style={{animationDelay: '12s'}} />
+          <div className="flowing-orb gray wave-animation w-56 h-56 top-20 right-1/3" style={{animationDelay: '5s'}} />
           
-          {/* Floating particles */}
-          {[...Array(12)].map((_, i) => (
+          {/* Floating particles in mixed colors */}
+          {[...Array(8)].map((_, i) => (
             <div 
-              key={i}
-              className="floating-particle particle" 
+              key={`blue-${i}`}
+              className="floating-particle blue particle" 
               style={{
                 left: `${Math.random() * 100}%`,
                 animationDelay: `${i * 2}s`,
@@ -118,16 +120,40 @@ export default function Landing() {
               }}
             />
           ))}
+          {[...Array(6)].map((_, i) => (
+            <div 
+              key={`gray-${i}`}
+              className="floating-particle gray particle" 
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${i * 2.5 + 1}s`,
+                animationDuration: `${14 + Math.random() * 4}s`
+              }}
+            />
+          ))}
+          {[...Array(4)].map((_, i) => (
+            <div 
+              key={`dark-${i}`}
+              className="floating-particle dark particle" 
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${i * 3}s`,
+                animationDuration: `${16 + Math.random() * 4}s`
+              }}
+            />
+          ))}
         </div>
         
         <div className="relative text-center px-4 sm:px-6 lg:px-8 z-10">
           <div>
-            <h1 className="text-7xl md:text-9xl font-extralight text-white mb-8 tracking-tight">
-              Музыка
-            </h1>
-            <h2 className="text-4xl md:text-5xl font-light text-white mb-12 tracking-wide">
-              в новом измерении
-            </h2>
+            <div className="mb-12">
+              <h1 className="text-7xl md:text-9xl font-extralight text-white mb-4 tracking-tight">
+                Музыка
+              </h1>
+              <h2 className="text-4xl md:text-5xl font-light text-white tracking-wide">
+                в новом измерении
+              </h2>
+            </div>
             
             <div className="max-w-4xl mx-auto">
               <p className="text-xl md:text-2xl text-white mb-6 leading-relaxed font-light">
@@ -148,8 +174,8 @@ export default function Landing() {
       </section>
 
       {/* New Releases Carousel */}
-      <section className="py-32 relative">
-        <div className="flowing-orb morphing-shape w-72 h-72 -top-10 -right-20 opacity-10" style={{animationDelay: '5s'}} />
+      <section className="py-32 relative bg-white">
+        <div className="flowing-orb blue morphing-shape w-72 h-72 -top-10 -right-20" style={{animationDelay: '5s'}} />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-16 hero-animation">
@@ -256,8 +282,8 @@ export default function Landing() {
       </section>
 
       {/* Top Rated Carousel */}
-      <section className="py-32 bg-muted/20 relative">
-        <div className="flowing-orb wave-animation w-80 h-80 -bottom-10 -left-20 opacity-10" style={{animationDelay: '2s'}} />
+      <section className="py-32 bg-gray-50/50 relative">
+        <div className="flowing-orb gray wave-animation w-80 h-80 -bottom-10 -left-20" style={{animationDelay: '2s'}} />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-16 hero-animation">
@@ -369,8 +395,8 @@ export default function Landing() {
       </section>
 
       {/* Footer CTA */}
-      <section className="py-40 relative">
-        <div className="flowing-orb morphing-shape w-96 h-96 top-10 left-1/2 -translate-x-1/2 opacity-5" style={{animationDelay: '10s'}} />
+      <section className="py-40 relative bg-white">
+        <div className="flowing-orb blue morphing-shape w-96 h-96 top-10 left-1/2 -translate-x-1/2" style={{animationDelay: '10s'}} />
         
         <div className="max-w-5xl mx-auto text-center px-4 sm:px-6 lg:px-8">
           <div className="hero-animation">
