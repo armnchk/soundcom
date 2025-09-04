@@ -511,8 +511,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const activeOnly = req.query.activeOnly !== 'false';
       const collections = await storage.getCollections(activeOnly);
-      // Sort by sortOrder (system collections with negative sortOrder first)
-      const sortedCollections = collections.sort((a, b) => a.sortOrder - b.sortOrder);
+      // Sort by sortOrder
+      const sortedCollections = collections.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
       res.json(sortedCollections);
     } catch (error) {
       console.error("Error fetching collections:", error);
@@ -672,47 +672,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // System collections management
-  app.post('/api/collections/initialize-system', isAuthenticated, async (req: any, res) => {
-    try {
-      // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
-      await storage.initializeSystemCollections();
-      res.json({ message: "System collections initialized successfully" });
-    } catch (error) {
-      console.error("Error initializing system collections:", error);
-      res.status(500).json({ message: "Failed to initialize system collections" });
-    }
-  });
-
-  app.post('/api/collections/update-system/:type', isAuthenticated, async (req: any, res) => {
-    try {
-      // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
-      const type = req.params.type as 'latest' | 'most_discussed';
-      if (!['latest', 'most_discussed'].includes(type)) {
-        return res.status(400).json({ message: "Invalid collection type" });
-      }
-
-      await storage.updateSystemCollection(type);
-      res.json({ message: `System collection '${type}' updated successfully` });
-    } catch (error) {
-      console.error(`Error updating system collection ${req.params.type}:`, error);
-      res.status(500).json({ message: "Failed to update system collection" });
-    }
-  });
 
   const httpServer = createServer(app);
   return httpServer;

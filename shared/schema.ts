@@ -99,7 +99,6 @@ export const collections = pgTable("collections", {
   title: varchar("title", { length: 255 }).notNull(),
   subtitle: varchar("subtitle", { length: 255 }),
   description: text("description"),
-  type: varchar("type", { length: 50 }).default("custom"), // 'custom', 'latest', 'most_discussed'
   isActive: boolean("is_active").default(true),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow(),

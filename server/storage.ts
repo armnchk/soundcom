@@ -90,9 +90,6 @@ export interface IStorage {
   removeReleaseFromCollection(collectionId: number, releaseId: number): Promise<void>;
   updateCollectionReleaseSortOrder(collectionId: number, releaseId: number, sortOrder: number): Promise<void>;
   
-  // System collections
-  initializeSystemCollections(): Promise<void>;
-  updateSystemCollection(type: 'latest' | 'most_discussed'): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -661,118 +658,6 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
-  // System collections operations
-  async initializeSystemCollections(): Promise<void> {
-    try {
-      // Check if system collections already exist
-      const existingCollections = await db
-        .select()
-        .from(collections)
-        .where(or(
-          eq(collections.type, 'latest'),
-          eq(collections.type, 'most_discussed')
-        ));
-
-      const existingTypes = existingCollections.map(c => c.type);
-
-      // Create "Latest Releases" collection if it doesn't exist
-      if (!existingTypes.includes('latest')) {
-        const [latestCollection] = await db
-          .insert(collections)
-          .values({
-            title: 'Latest Releases',
-            subtitle: 'Newest additions to our catalog',
-            description: 'Discover the most recent releases added to the platform',
-            type: 'latest',
-            isActive: true,
-            sortOrder: -2, // Higher priority than custom collections
-          })
-          .returning();
-
-        // Add latest releases to this collection
-        await this.updateSystemCollection('latest');
-      }
-
-      // Create "Most Discussed" collection if it doesn't exist
-      if (!existingTypes.includes('most_discussed')) {
-        const [discussedCollection] = await db
-          .insert(collections)
-          .values({
-            title: 'Most Discussed',
-            subtitle: 'Albums generating the most conversation',
-            description: 'The releases with the most comments and community engagement',
-            type: 'most_discussed',
-            isActive: true,
-            sortOrder: -1, // High priority
-          })
-          .returning();
-
-        // Add most discussed releases to this collection
-        await this.updateSystemCollection('most_discussed');
-      }
-    } catch (error) {
-      console.error('Error initializing system collections:', error);
-      throw error;
-    }
-  }
-
-  async updateSystemCollection(type: 'latest' | 'most_discussed'): Promise<void> {
-    try {
-      // Find the system collection
-      const [systemCollection] = await db
-        .select()
-        .from(collections)
-        .where(eq(collections.type, type));
-
-      if (!systemCollection) return;
-
-      // Clear existing releases from the collection
-      await db
-        .delete(collectionReleases)
-        .where(eq(collectionReleases.collectionId, systemCollection.id));
-
-      let releasesList: any[] = [];
-
-      if (type === 'latest') {
-        // Get latest releases
-        releasesList = await db
-          .select({
-            id: releases.id,
-          })
-          .from(releases)
-          .orderBy(desc(releases.createdAt))
-          .limit(12);
-      } else if (type === 'most_discussed') {
-        // Get most discussed releases
-        releasesList = await db
-          .select({
-            id: releases.id,
-            commentCount: sql<number>`count(${comments.id})`.as('comment_count'),
-          })
-          .from(releases)
-          .leftJoin(comments, eq(releases.id, comments.releaseId))
-          .groupBy(releases.id)
-          .orderBy(desc(sql`count(${comments.id})`))
-          .limit(12);
-      }
-
-      // Add releases to the system collection
-      if (releasesList.length > 0) {
-        const collectionReleaseValues = releasesList.map((release, index) => ({
-          collectionId: systemCollection.id,
-          releaseId: release.id,
-          sortOrder: index,
-        }));
-
-        await db
-          .insert(collectionReleases)
-          .values(collectionReleaseValues);
-      }
-    } catch (error) {
-      console.error(`Error updating system collection ${type}:`, error);
-      throw error;
-    }
-  }
 }
 
 export const storage = new DatabaseStorage();

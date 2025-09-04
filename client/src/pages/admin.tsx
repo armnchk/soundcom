@@ -1077,38 +1077,6 @@ function CollectionsTab() {
     }
   });
 
-  // Initialize system collections mutation
-  const initializeSystemCollectionsMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/collections/initialize-system'),
-    onSuccess: () => {
-      toast({ title: "Системные подборки созданы успешно" });
-      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Ошибка при создании системных подборок", 
-        description: error.message || 'Неизвестная ошибка',
-        variant: "destructive" 
-      });
-    }
-  });
-
-  // Update system collection mutation
-  const updateSystemCollectionMutation = useMutation({
-    mutationFn: (type: 'latest' | 'most_discussed') => 
-      apiRequest('POST', `/api/collections/update-system/${type}`),
-    onSuccess: (_, type) => {
-      toast({ title: `Системная подборка "${type === 'latest' ? 'Новые релизы' : 'Популярные'}" обновлена` });
-      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
-    },
-    onError: (error: any) => {
-      toast({ 
-        title: "Ошибка при обновлении системной подборки", 
-        description: error.message || 'Неизвестная ошибка',
-        variant: "destructive" 
-      });
-    }
-  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1164,25 +1132,14 @@ function CollectionsTab() {
               <h3 className="text-lg font-semibold">Управление подборками</h3>
               <p className="text-sm text-muted-foreground">Создавайте и управляйте тематическими подборками релизов</p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => initializeSystemCollectionsMutation.mutate()}
-                disabled={initializeSystemCollectionsMutation.isPending}
-                data-testid="button-init-system-collections"
-              >
-                <Database className="w-4 h-4 mr-2" />
-                {initializeSystemCollectionsMutation.isPending ? 'Создаю...' : 'Создать системные подборки'}
-              </Button>
-              <Button
-                onClick={() => setIsCreating(true)}
-                disabled={isCreating}
-                data-testid="button-create-collection"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Создать подборку
-              </Button>
-            </div>
+            <Button
+              onClick={() => setIsCreating(true)}
+              disabled={isCreating}
+              data-testid="button-create-collection"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Создать подборку
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -1312,26 +1269,9 @@ function CollectionsTab() {
                         <span className={collection.isActive ? "text-green-600" : "text-red-600"}>
                           {collection.isActive ? "Активная" : "Неактивная"}
                         </span>
-                        {(collection.type === 'latest' || collection.type === 'most_discussed') && (
-                          <span className="text-blue-600 font-medium">Системная</span>
-                        )}
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      {/* System collection update button */}
-                      {(collection.type === 'latest' || collection.type === 'most_discussed') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => updateSystemCollectionMutation.mutate(collection.type)}
-                          disabled={updateSystemCollectionMutation.isPending}
-                          data-testid={`button-update-system-${collection.id}`}
-                          className="bg-blue-50 hover:bg-blue-100 border-blue-200 text-blue-700"
-                        >
-                          <Database className="w-4 h-4 mr-1" />
-                          Обновить
-                        </Button>
-                      )}
                       <Button
                         variant="outline"
                         size="sm"
