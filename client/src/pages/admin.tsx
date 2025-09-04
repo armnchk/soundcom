@@ -995,7 +995,7 @@ function CollectionsTab() {
     mutationFn: (data: any) => apiRequest('POST', '/api/collections', data),
     onSuccess: () => {
       toast({ title: "Подборка создана успешно" });
-      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections?activeOnly=false'] });
       setIsCreating(false);
       setCollectionForm({ title: '', subtitle: '', description: '', isActive: true, sortOrder: 0 });
     },
@@ -1013,7 +1013,7 @@ function CollectionsTab() {
     mutationFn: ({ id, data }: { id: number, data: any }) => apiRequest('PUT', `/api/collections/${id}`, data),
     onSuccess: () => {
       toast({ title: "Подборка обновлена успешно" });
-      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections?activeOnly=false'] });
       setEditingCollection(null);
       setIsCreating(false);
     },
@@ -1031,7 +1031,7 @@ function CollectionsTab() {
     mutationFn: (id: number) => apiRequest('DELETE', `/api/collections/${id}`),
     onSuccess: () => {
       toast({ title: "Подборка удалена успешно" });
-      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections?activeOnly=false'] });
     },
     onError: (error: any) => {
       toast({ 
@@ -1048,7 +1048,7 @@ function CollectionsTab() {
       apiRequest('POST', `/api/collections/${collectionId}/releases`, { releaseId, sortOrder }),
     onSuccess: () => {
       toast({ title: "Релиз добавлен в подборку" });
-      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections?activeOnly=false'] });
       setReleaseSearch('');
     },
     onError: (error: any) => {
@@ -1066,7 +1066,7 @@ function CollectionsTab() {
       apiRequest('DELETE', `/api/collections/${collectionId}/releases/${releaseId}`),
     onSuccess: () => {
       toast({ title: "Релиз удален из подборки" });
-      queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/collections?activeOnly=false'] });
     },
     onError: (error: any) => {
       toast({ 
