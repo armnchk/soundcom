@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { StarRating } from "../release/rating-display";
-import { ThumbsUp, ThumbsDown, Edit, Trash2, User } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Flag, Edit, Trash2, User } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -68,6 +68,34 @@ export function CommentItem({
     },
   });
 
+  const reportMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('POST', `/api/comments/${comment.id}/report`, { 
+        reason: 'Inappropriate content' 
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Жалоба отправлена" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Не авторизован",
+          description: "Вы не авторизованы. Выполняется вход...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({ 
+        title: "Ошибка отправки жалобы", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -159,6 +187,17 @@ export function CommentItem({
               <span data-testid="text-dislike-count">{comment.dislikeCount}</span>
             </Button>
             
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-red-600 h-auto p-1"
+              onClick={() => reportMutation.mutate()}
+              disabled={reportMutation.isPending}
+              data-testid="button-report"
+              title="Пожаловаться"
+            >
+              <Flag className="w-3 h-3" />
+            </Button>
             
             {isOwner && (
               <div className="ml-auto flex items-center space-x-2">
