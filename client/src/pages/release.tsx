@@ -1,0 +1,256 @@
+import { useParams, useLocation } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
+import Navbar from "@/components/layout/navbar";
+import Footer from "@/components/layout/footer";
+import { StarRating } from "@/components/release/rating-display";
+import { RatingInput } from "@/components/release/rating-input";
+import { CommentBlock } from "@/components/comments/comment-block";
+import { NicknameModal } from "@/components/modals/nickname-modal";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Music, ExternalLink, ArrowLeft } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { isUnauthorizedError } from "@/lib/authUtils";
+import { useState } from "react";
+
+export default function Release() {
+  const { id } = useParams<{ id: string }>();
+  const [, setLocation] = useLocation();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [showNicknameModal, setShowNicknameModal] = useState(false);
+  const [userRating, setUserRating] = useState(0);
+
+  const releaseId = parseInt(id || '0');
+
+  const { data: release, isLoading } = useQuery({
+    queryKey: ["/api/releases", releaseId],
+    enabled: !!releaseId,
+  });
+
+  const { data: currentUserRating } = useQuery({
+    queryKey: ["/api/releases", releaseId, "user-rating"],
+    enabled: !!releaseId && isAuthenticated,
+  });
+
+  useEffect(() => {
+    if (isAuthenticated && !authLoading && user && !user.nickname) {
+      setShowNicknameModal(true);
+    }
+  }, [isAuthenticated, authLoading, user]);
+
+  useEffect(() => {
+    if (currentUserRating) {
+      setUserRating(currentUserRating.score);
+    }
+  }, [currentUserRating]);
+
+  const ratingMutation = useMutation({
+    mutationFn: async (score: number) => {
+      await apiRequest('POST', `/api/releases/${releaseId}/rate`, { score });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId, "user-rating"] });
+      toast({ title: "Rating submitted successfully!" });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Unauthorized",
+          description: "You are logged out. Logging in again...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({ 
+        title: "Failed to submit rating", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleRatingSubmit = (newRating: number) => {
+    setUserRating(newRating);
+    ratingMutation.mutate(newRating);
+  };
+
+  if (authLoading || isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
+          <div className="animate-pulse text-muted-foreground">Loading release...</div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!release) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
+          <Card>
+            <CardContent className="p-12 text-center">
+              <h1 className="text-2xl font-bold text-foreground mb-2">Release Not Found</h1>
+              <p className="text-muted-foreground mb-4">The release you're looking for doesn't exist.</p>
+              <Button onClick={() => setLocation("/")} data-testid="button-go-home">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Go Home
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  const streamingLinks = release.streamingLinks as { spotify?: string; appleMusic?: string } || {};
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Card className="p-6 md:p-8">
+          <div className="grid md:grid-cols-3 gap-8">
+            {/* Release Info */}
+            <div className="md:col-span-1">
+              <div className="aspect-square mb-6 overflow-hidden rounded-xl">
+                {release.coverUrl ? (
+                  <img 
+                    src={release.coverUrl} 
+                    alt={`${release.title} cover`}
+                    className="w-full h-full object-cover shadow-lg"
+                    data-testid="img-release-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center rounded-xl">
+                    <Music className="w-24 h-24 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground mb-1" data-testid="text-release-title">
+                    {release.title}
+                  </h1>
+                  <button
+                    onClick={() => setLocation(`/artist/${release.artist.id}`)}
+                    className="text-lg text-primary hover:text-primary/80 transition-colors"
+                    data-testid="link-artist"
+                  >
+                    {release.artist.name}
+                  </button>
+                  <p className="text-sm text-muted-foreground">
+                    Released {new Date(release.releaseDate).toLocaleDateString()}
+                  </p>
+                </div>
+                
+                {/* Average Rating Display */}
+                <Card>
+                  <CardContent className="p-4">
+                    <h3 className="text-sm font-semibold text-foreground mb-2">Community Rating</h3>
+                    <div className="flex items-center space-x-3">
+                      <span className="text-3xl font-bold text-primary" data-testid="text-average-rating">
+                        {release.averageRating.toFixed(1)}
+                      </span>
+                      <div>
+                        <StarRating rating={release.averageRating} maxRating={10} size="sm" />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Based on community ratings
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* User's Rating */}
+                {isAuthenticated && (
+                  <Card>
+                    <CardContent className="p-4">
+                      <RatingInput
+                        rating={userRating}
+                        onRatingChange={handleRatingSubmit}
+                        maxRating={10}
+                        size="md"
+                        label="Your Rating"
+                      />
+                      {ratingMutation.isPending && (
+                        <p className="text-xs text-muted-foreground mt-2">Saving rating...</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Streaming Links */}
+                {(streamingLinks.spotify || streamingLinks.appleMusic) && (
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-foreground">Listen On</h3>
+                    <div className="flex flex-col space-y-2">
+                      {streamingLinks.spotify && (
+                        <Button
+                          variant="secondary"
+                          className="justify-start"
+                          asChild
+                          data-testid="link-spotify"
+                        >
+                          <a href={streamingLinks.spotify} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Spotify
+                          </a>
+                        </Button>
+                      )}
+                      {streamingLinks.appleMusic && (
+                        <Button
+                          variant="secondary"
+                          className="justify-start"
+                          asChild
+                          data-testid="link-apple-music"
+                        >
+                          <a href={streamingLinks.appleMusic} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            Apple Music
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Comments Section */}
+            <div className="md:col-span-2">
+              <CommentBlock
+                releaseId={releaseId}
+                isAuthenticated={isAuthenticated}
+                currentUserId={user?.id}
+              />
+            </div>
+          </div>
+        </Card>
+      </main>
+
+      <Footer />
+      
+      {/* Nickname Modal */}
+      <NicknameModal
+        open={showNicknameModal}
+        onClose={() => setShowNicknameModal(false)}
+      />
+    </div>
+  );
+}
