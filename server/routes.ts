@@ -546,9 +546,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const validatedData = insertCollectionSchema.parse(req.body);
+      // Extract releaseIds if present, validate the rest
+      const { releaseIds, ...collectionData } = req.body;
+      const validatedData = insertCollectionSchema.parse(collectionData);
+      
+      // Create the collection first
       const collection = await storage.createCollection(validatedData);
-      res.status(201).json(collection);
+      
+      // Add releases if provided
+      if (releaseIds && Array.isArray(releaseIds) && releaseIds.length > 0) {
+        for (let i = 0; i < releaseIds.length; i++) {
+          await storage.addReleaseToCollection(collection.id, releaseIds[i], i);
+        }
+      }
+      
+      // Return collection with releases
+      const fullCollection = await storage.getCollection(collection.id);
+      res.status(201).json(fullCollection);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid collection data", errors: error.errors });
@@ -569,9 +583,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const id = parseInt(req.params.id);
-      const validatedData = insertCollectionSchema.partial().parse(req.body);
+      
+      // Extract releaseIds if present, validate the rest
+      const { releaseIds, ...collectionData } = req.body;
+      const validatedData = insertCollectionSchema.partial().parse(collectionData);
+      
+      // Update the collection first
       const collection = await storage.updateCollection(id, validatedData);
-      res.json(collection);
+      
+      // Update releases if provided
+      if (releaseIds && Array.isArray(releaseIds)) {
+        // Remove all existing releases for this collection
+        await storage.removeAllReleasesFromCollection(id);
+        
+        // Add new releases with proper order
+        for (let i = 0; i < releaseIds.length; i++) {
+          await storage.addReleaseToCollection(id, releaseIds[i], i);
+        }
+      }
+      
+      // Return updated collection with releases
+      const fullCollection = await storage.getCollection(id);
+      res.json(fullCollection);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Invalid collection data", errors: error.errors });

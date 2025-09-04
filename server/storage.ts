@@ -648,6 +648,12 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
+  async removeAllReleasesFromCollection(collectionId: number): Promise<void> {
+    await db
+      .delete(collectionReleases)
+      .where(eq(collectionReleases.collectionId, collectionId));
+  }
+
   async updateCollectionReleaseSortOrder(collectionId: number, releaseId: number, sortOrder: number): Promise<void> {
     await db
       .update(collectionReleases)
