@@ -29,12 +29,12 @@ export default function Release() {
   const releaseId = parseInt(id || '0');
 
   const { data: release, isLoading } = useQuery<Release & { artist: Artist; averageRating: number; commentCount: number }>({
-    queryKey: ["/api/releases", releaseId],
+    queryKey: [`/api/releases/${releaseId}`],
     enabled: !!releaseId,
   });
 
   const { data: currentUserRating } = useQuery<Rating>({
-    queryKey: ["/api/releases", releaseId, "user-rating"],
+    queryKey: [`/api/releases/${releaseId}/user-rating`],
     enabled: !!releaseId && isAuthenticated,
   });
 
@@ -55,8 +55,8 @@ export default function Release() {
       await apiRequest('POST', `/api/releases/${releaseId}/rate`, { score });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId, "user-rating"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/releases/${releaseId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/releases/${releaseId}/user-rating`] });
       toast({ title: "Rating submitted successfully!" });
     },
     onError: (error) => {
@@ -156,7 +156,7 @@ export default function Release() {
                     {release.artist.name}
                   </button>
                   <p className="text-sm text-muted-foreground">
-                    Released {new Date(release.releaseDate).toLocaleDateString()}
+                    Released {release.releaseDate ? new Date(release.releaseDate).toLocaleDateString() : 'Unknown'}
                   </p>
                 </div>
                 
@@ -166,10 +166,10 @@ export default function Release() {
                     <h3 className="text-sm font-semibold text-foreground mb-2">Community Rating</h3>
                     <div className="flex items-center space-x-3">
                       <span className="text-3xl font-bold text-primary" data-testid="text-average-rating">
-                        {release.averageRating.toFixed(1)}
+                        {Number(release.averageRating || 0).toFixed(1)}
                       </span>
                       <div>
-                        <StarRating rating={release.averageRating} maxRating={10} size="sm" />
+                        <StarRating rating={Number(release.averageRating || 0)} maxRating={10} size="sm" />
                         <p className="text-xs text-muted-foreground mt-1">
                           Based on community ratings
                         </p>
