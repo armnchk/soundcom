@@ -77,84 +77,87 @@ export default function Landing() {
   }, [topRatedReleases.length]);
 
   return (
-    <div className="min-h-screen gradient-bg dark:gradient-bg-dark">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 glass-effect">
+    <div className="min-h-screen abstract-bg">
+      {/* Simplified Header */}
+      <header className="relative z-50 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3 hero-animation">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center float-animation">
-                <Music className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-2xl font-light text-foreground tracking-tight">MusicReview</span>
-            </div>
-
+          <div className="flex items-center justify-between">
+            <div></div>
+            <h1 className="text-3xl font-light text-foreground tracking-wide text-glow">
+              RevYou
+            </h1>
             <Button 
               onClick={handleSignIn}
-              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-6 py-2 smooth-hover"
+              className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-8 py-2.5 text-sm font-medium neon-glow smooth-hover border-0"
               data-testid="button-signin"
             >
               Войти
             </Button>
           </div>
         </div>
-      </nav>
+      </header>
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden min-h-screen flex items-center justify-center">
-        <div className="absolute inset-0 opacity-5">
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent" />
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl float-animation" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-primary/3 rounded-full blur-3xl float-animation" style={{animationDelay: '3s'}} />
+      {/* Hero Section with Abstract Background */}
+      <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden">
+        {/* Animated Abstract Background */}
+        <div className="absolute inset-0">
+          {/* Morphing blobs */}
+          <div className="flowing-orb morphing-shape w-96 h-96 top-10 left-10 opacity-30" />
+          <div className="flowing-orb morphing-shape w-80 h-80 bottom-20 right-20 opacity-20" style={{animationDelay: '7s'}} />
+          <div className="flowing-orb wave-animation w-64 h-64 top-1/2 left-1/4 opacity-25" style={{animationDelay: '3s'}} />
+          
+          {/* Floating particles */}
+          {[...Array(12)].map((_, i) => (
+            <div 
+              key={i}
+              className="floating-particle particle" 
+              style={{
+                left: `${Math.random() * 100}%`,
+                animationDelay: `${i * 2}s`,
+                animationDuration: `${12 + Math.random() * 6}s`
+              }}
+            />
+          ))}
         </div>
         
-        <div className="relative text-center px-4 sm:px-6 lg:px-8 hero-animation">
-          <div className="mb-12">
-            <div className="inline-flex items-center justify-center mb-8">
-              <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center mr-6 pulse-soft">
-                <Music className="w-12 h-12 text-primary-foreground" />
-              </div>
-            </div>
-            
-            <h1 className="text-6xl md:text-8xl font-extralight text-foreground mb-6 tracking-tight">
+        <div className="relative text-center px-4 sm:px-6 lg:px-8 z-10">
+          <div className="hero-animation">
+            <h1 className="text-7xl md:text-9xl font-extralight text-foreground mb-8 tracking-tight text-glow">
               Музыка
             </h1>
-            <h2 className="text-3xl md:text-4xl font-light text-muted-foreground mb-8 tracking-wide">
+            <h2 className="text-4xl md:text-5xl font-light text-muted-foreground/90 mb-12 tracking-wide">
               в новом измерении
             </h2>
             
-            <p className="text-lg text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
-              Откройте для себя мир музыки через призму сообщества. 
-              Находите, оценивайте, обсуждайте.
-            </p>
-            
-            <Button 
-              size="lg"
-              onClick={handleSignIn}
-              className="bg-primary text-primary-foreground px-12 py-4 text-lg hover:bg-primary/90 rounded-full smooth-hover font-medium"
-              data-testid="button-signin-hero"
-            >
-              Начать путешествие
-            </Button>
+            <div className="max-w-4xl mx-auto">
+              <p className="text-xl md:text-2xl text-foreground/80 mb-6 leading-relaxed font-light">
+                Откройте для себя мир музыки через призму сообщества.
+              </p>
+              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed font-light">
+                Находите, оценивайте, обсуждайте.
+              </p>
+            </div>
           </div>
           
-          <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-            <div className="w-6 h-10 border-2 border-muted-foreground rounded-full flex justify-center">
-              <div className="w-1 h-3 bg-muted-foreground rounded-full mt-2 animate-pulse" />
+          <div className="absolute bottom-12 left-1/2 transform -translate-x-1/2 animate-bounce opacity-50">
+            <div className="w-6 h-10 border-2 border-primary/50 rounded-full flex justify-center">
+              <div className="w-1 h-3 bg-primary rounded-full mt-2 animate-pulse" />
             </div>
           </div>
         </div>
       </section>
 
       {/* New Releases Carousel */}
-      <section className="py-24">
+      <section className="py-32 relative">
+        <div className="flowing-orb morphing-shape w-72 h-72 -top-10 -right-20 opacity-10" style={{animationDelay: '5s'}} />
+        
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-12 slide-in">
+          <div className="flex items-center justify-between mb-16 hero-animation">
             <div>
-              <h2 className="text-4xl font-light text-foreground mb-2 tracking-tight">
+              <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight text-glow">
                 Новые релизы
               </h2>
-              <p className="text-muted-foreground text-lg">
+              <p className="text-muted-foreground text-xl font-light">
                 Самые обсуждаемые альбомы недели
               </p>
             </div>
@@ -164,19 +167,19 @@ export default function Landing() {
                 variant="ghost"
                 size="sm"
                 onClick={prevNewReleases}
-                className="rounded-full w-10 h-10 p-0 smooth-hover"
+                className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
                 data-testid="button-prev-new"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5 text-primary" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={nextNewReleases}
-                className="rounded-full w-10 h-10 p-0 smooth-hover"
+                className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
                 data-testid="button-next-new"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5 text-primary" />
               </Button>
             </div>
           </div>
@@ -190,22 +193,24 @@ export default function Landing() {
             >
               {newestReleases.map((release, index) => (
                 <div key={release.id} className="carousel-item w-1/4 px-3">
-                  <Card className="border-0 shadow-sm smooth-hover bg-card/50 backdrop-blur">
+                  <Card className="border-0 shadow-lg smooth-hover bg-card/70 backdrop-blur-sm rounded-2xl overflow-hidden">
                     <CardContent className="p-0">
-                      <div className="aspect-square rounded-t-lg overflow-hidden mb-4 relative group">
+                      <div className="aspect-square overflow-hidden mb-4 relative group">
                         {release.coverUrl ? (
                           <img 
                             src={release.coverUrl} 
                             alt={`${release.title} cover`}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
                           />
                         ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
-                            <Music className="w-12 h-12 text-muted-foreground" />
+                          <div className="w-full h-full bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-all duration-300">
+                            <Music className="w-16 h-16 text-muted-foreground group-hover:text-primary transition-colors" />
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                          <Play className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                          <div className="bg-primary/90 rounded-full p-3 neon-glow">
+                            <Play className="w-6 h-6 text-primary-foreground" />
+                          </div>
                         </div>
                       </div>
                       
@@ -251,14 +256,16 @@ export default function Landing() {
       </section>
 
       {/* Top Rated Carousel */}
-      <section className="py-24 bg-muted/30">
+      <section className="py-32 bg-muted/20 relative">
+        <div className="flowing-orb wave-animation w-80 h-80 -bottom-10 -left-20 opacity-10" style={{animationDelay: '2s'}} />
+        
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-12 slide-in">
+          <div className="flex items-center justify-between mb-16 hero-animation">
             <div>
-              <h2 className="text-4xl font-light text-foreground mb-2 tracking-tight">
+              <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight text-glow">
                 Лучшие оценки
               </h2>
-              <p className="text-muted-foreground text-lg">
+              <p className="text-muted-foreground text-xl font-light">
                 Высоко оценённые сообществом
               </p>
             </div>
@@ -268,19 +275,19 @@ export default function Landing() {
                 variant="ghost"
                 size="sm"
                 onClick={prevTopRated}
-                className="rounded-full w-10 h-10 p-0 smooth-hover"
+                className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
                 data-testid="button-prev-top"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-5 h-5 text-primary" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={nextTopRated}
-                className="rounded-full w-10 h-10 p-0 smooth-hover"
+                className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
                 data-testid="button-next-top"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-5 h-5 text-primary" />
               </Button>
             </div>
           </div>
@@ -294,24 +301,26 @@ export default function Landing() {
             >
               {topRatedReleases.map((release, index) => (
                 <div key={release.id} className="carousel-item w-1/4 px-3">
-                  <Card className="border-0 shadow-sm smooth-hover bg-card/80 backdrop-blur">
+                  <Card className="border-0 shadow-lg smooth-hover bg-card/80 backdrop-blur-sm rounded-2xl overflow-hidden">
                     <CardContent className="p-0">
-                      <div className="aspect-square rounded-t-lg overflow-hidden mb-4 relative group">
+                      <div className="aspect-square overflow-hidden mb-4 relative group">
                         {release.coverUrl ? (
                           <img 
                             src={release.coverUrl} 
                             alt={`${release.title} cover`}
-                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
                           />
                         ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center group-hover:bg-muted/80 transition-colors">
-                            <Music className="w-12 h-12 text-muted-foreground" />
+                          <div className="w-full h-full bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-all duration-300">
+                            <Music className="w-16 h-16 text-muted-foreground group-hover:text-primary transition-colors" />
                           </div>
                         )}
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                          <Play className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                          <div className="bg-primary/90 rounded-full p-3 neon-glow">
+                            <Play className="w-6 h-6 text-primary-foreground" />
+                          </div>
                         </div>
-                        <div className="absolute top-3 right-3 bg-primary text-primary-foreground px-2 py-1 rounded-full text-xs font-medium">
+                        <div className="absolute top-4 right-4 bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-full text-sm font-medium neon-glow">
                           {release.averageRating.toFixed(1)}
                         </div>
                       </div>
@@ -360,41 +369,43 @@ export default function Landing() {
       </section>
 
       {/* Footer CTA */}
-      <section className="py-32">
-        <div className="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8 hero-animation">
-          <div className="mb-8">
-            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Music className="w-8 h-8 text-primary" />
+      <section className="py-40 relative">
+        <div className="flowing-orb morphing-shape w-96 h-96 top-10 left-1/2 -translate-x-1/2 opacity-5" style={{animationDelay: '10s'}} />
+        
+        <div className="max-w-5xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+          <div className="hero-animation">
+            <div className="w-20 h-20 bg-primary/20 rounded-3xl flex items-center justify-center mx-auto mb-8 neon-glow">
+              <Music className="w-10 h-10 text-primary float-animation" />
             </div>
-            <h2 className="text-3xl font-light text-foreground mb-4 tracking-tight">
+            <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-6 tracking-tight text-glow">
               Начните своё музыкальное путешествие
             </h2>
-            <p className="text-lg text-muted-foreground mb-12 leading-relaxed max-w-2xl mx-auto">
+            <p className="text-xl md:text-2xl text-muted-foreground mb-16 leading-relaxed max-w-3xl mx-auto font-light">
               Присоединяйтесь к сообществу меломанов и откройте для себя музыку в новом свете
             </p>
+            
+            <Button 
+              size="lg"
+              onClick={handleSignIn}
+              className="bg-primary text-primary-foreground px-16 py-5 text-xl hover:bg-primary/90 rounded-full smooth-hover font-light neon-glow border-0"
+              data-testid="button-signin-cta"
+            >
+              Присоединиться
+            </Button>
           </div>
           
-          <Button 
-            size="lg"
-            onClick={handleSignIn}
-            className="bg-primary text-primary-foreground px-12 py-4 text-lg hover:bg-primary/90 rounded-full smooth-hover font-medium"
-            data-testid="button-signin-cta"
-          >
-            Присоединиться
-          </Button>
-          
-          <div className="mt-16 grid grid-cols-3 gap-8 max-w-md mx-auto opacity-60">
+          <div className="mt-24 grid grid-cols-3 gap-12 max-w-2xl mx-auto opacity-60">
             <div className="text-center">
-              <div className="text-2xl font-light text-foreground mb-1">12К+</div>
-              <div className="text-xs text-muted-foreground">Релизов</div>
+              <div className="text-4xl md:text-5xl font-extralight text-foreground mb-2">12К+</div>
+              <div className="text-sm text-muted-foreground font-light">Релизов</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-light text-foreground mb-1">8К+</div>
-              <div className="text-xs text-muted-foreground">Пользователей</div>
+              <div className="text-4xl md:text-5xl font-extralight text-foreground mb-2">8К+</div>
+              <div className="text-sm text-muted-foreground font-light">Пользователей</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-light text-foreground mb-1">45К+</div>
-              <div className="text-xs text-muted-foreground">Отзывов</div>
+              <div className="text-4xl md:text-5xl font-extralight text-foreground mb-2">45К+</div>
+              <div className="text-sm text-muted-foreground font-light">Отзывов</div>
             </div>
           </div>
         </div>
