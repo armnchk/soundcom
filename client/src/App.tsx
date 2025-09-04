@@ -18,16 +18,18 @@ function Router() {
 
   return (
     <Switch>
+      {/* Public routes - accessible to everyone */}
+      <Route path="/release/:id" component={Release} />
+      <Route path="/artist/:id" component={Artist} />
+      <Route path="/search" component={Search} />
+      
       {isLoading || !isAuthenticated ? (
         <Route path="/" component={Landing} />
       ) : (
         <>
           <Route path="/" component={Home} />
-          <Route path="/release/:id" component={Release} />
-          <Route path="/artist/:id" component={Artist} />
           <Route path="/profile/:id?" component={Profile} />
           <Route path="/admin" component={Admin} />
-          <Route path="/search" component={Search} />
         </>
       )}
       <Route component={NotFound} />
