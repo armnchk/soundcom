@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Music, Play, ChevronLeft, ChevronRight, Star, MessageCircle } from "lucide-react";
@@ -17,6 +18,7 @@ interface ReleaseWithDetails {
 }
 
 export default function Landing() {
+  const [, setLocation] = useLocation();
   const [newReleasesIndex, setNewReleasesIndex] = useState(0);
   const [topRatedIndex, setTopRatedIndex] = useState(0);
 
@@ -219,7 +221,10 @@ export default function Landing() {
             >
               {newestReleases.map((release, index) => (
                 <div key={release.id} className="carousel-item w-1/4 px-3">
-                  <Card className="border-0 shadow-lg smooth-hover bg-card/70 backdrop-blur-sm rounded-2xl overflow-hidden">
+                  <Card 
+                    className="border-0 shadow-lg smooth-hover bg-card/70 backdrop-blur-sm rounded-2xl overflow-hidden cursor-pointer"
+                    onClick={() => setLocation(`/release/${release.id}`)}
+                  >
                     <CardContent className="p-0">
                       <div className="aspect-square overflow-hidden mb-4 relative group">
                         {release.coverUrl ? (
@@ -263,14 +268,6 @@ export default function Landing() {
                           </div>
                         </div>
                         
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full mt-3 text-xs text-primary hover:text-primary/80 hover:bg-primary/5"
-                          data-testid={`button-view-${release.id}`}
-                        >
-                          Подробнее
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
@@ -327,7 +324,10 @@ export default function Landing() {
             >
               {topRatedReleases.map((release, index) => (
                 <div key={release.id} className="carousel-item w-1/4 px-3">
-                  <Card className="border-0 shadow-lg smooth-hover bg-card/80 backdrop-blur-sm rounded-2xl overflow-hidden">
+                  <Card 
+                    className="border-0 shadow-lg smooth-hover bg-card/80 backdrop-blur-sm rounded-2xl overflow-hidden cursor-pointer"
+                    onClick={() => setLocation(`/release/${release.id}`)}
+                  >
                     <CardContent className="p-0">
                       <div className="aspect-square overflow-hidden mb-4 relative group">
                         {release.coverUrl ? (
@@ -376,14 +376,6 @@ export default function Landing() {
                           </div>
                         </div>
                         
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full mt-3 text-xs text-primary hover:text-primary/80 hover:bg-primary/5"
-                          data-testid={`button-view-top-${release.id}`}
-                        >
-                          Послушать
-                        </Button>
                       </div>
                     </CardContent>
                   </Card>
