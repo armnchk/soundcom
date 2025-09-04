@@ -79,7 +79,7 @@ export default function Navbar() {
                     <Link href={`/profile/${user?.id}`}>
                       <a className="flex items-center" data-testid="link-profile">
                         <User className="w-4 h-4 mr-2" />
-                        Profile
+                        Профиль
                       </a>
                     </Link>
                   </DropdownMenuItem>
@@ -88,14 +88,14 @@ export default function Navbar() {
                       <Link href="/admin">
                         <a className="flex items-center" data-testid="link-admin">
                           <Shield className="w-4 h-4 mr-2" />
-                          Admin Panel
+                          Админ панель
                         </a>
                       </Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem onClick={handleSignOut} data-testid="button-signout">
                     <LogOut className="w-4 h-4 mr-2" />
-                    Sign Out
+                    Выйти
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -105,7 +105,7 @@ export default function Navbar() {
                 className="bg-primary text-primary-foreground hover:bg-primary/90"
                 data-testid="button-signin"
               >
-                Sign In
+                Войти
               </Button>
             )}
           </div>
