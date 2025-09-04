@@ -17,66 +17,45 @@ interface ReleaseWithDetails {
   commentCount: number;
 }
 
+interface Collection {
+  id: number;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  releases: ReleaseWithDetails[];
+}
+
 export default function Landing() {
   const [, setLocation] = useLocation();
-  const [newReleasesIndex, setNewReleasesIndex] = useState(0);
-  const [topRatedIndex, setTopRatedIndex] = useState(0);
+  const [collectionIndexes, setCollectionIndexes] = useState<{[key: number]: number}>({});
 
-  const { data: releases = [] } = useQuery<ReleaseWithDetails[]>({
-    queryKey: ["/api/releases"],
+  // Fetch featured collections from admin
+  const { data: collections = [], isLoading: collectionsLoading } = useQuery<Collection[]>({
+    queryKey: ["/api/collections"],
     queryFn: async () => {
-      const response = await fetch("/api/releases");
+      const response = await fetch('/api/collections?activeOnly=true');
       if (!response.ok) return [];
       return response.json();
     },
   });
 
-  const newestReleases = releases.slice(0, 12);
-  const topRatedReleases = [...releases]
-    .sort((a, b) => b.averageRating - a.averageRating)
-    .slice(0, 12);
-
   const handleSignIn = () => {
     window.location.href = "/api/login";
   };
 
-  const nextNewReleases = () => {
-    setNewReleasesIndex((prev) => 
-      prev + 4 >= newestReleases.length ? 0 : prev + 4
-    );
+  const nextCollection = (collectionId: number, releasesLength: number) => {
+    setCollectionIndexes(prev => ({
+      ...prev,
+      [collectionId]: ((prev[collectionId] || 0) + 4 >= releasesLength) ? 0 : (prev[collectionId] || 0) + 4
+    }));
   };
 
-  const prevNewReleases = () => {
-    setNewReleasesIndex((prev) => 
-      prev - 4 < 0 ? Math.max(0, newestReleases.length - 4) : prev - 4
-    );
+  const prevCollection = (collectionId: number, releasesLength: number) => {
+    setCollectionIndexes(prev => ({
+      ...prev,
+      [collectionId]: ((prev[collectionId] || 0) - 4 < 0) ? Math.max(0, releasesLength - 4) : (prev[collectionId] || 0) - 4
+    }));
   };
-
-  const nextTopRated = () => {
-    setTopRatedIndex((prev) => 
-      prev + 4 >= topRatedReleases.length ? 0 : prev + 4
-    );
-  };
-
-  const prevTopRated = () => {
-    setTopRatedIndex((prev) => 
-      prev - 4 < 0 ? Math.max(0, topRatedReleases.length - 4) : prev - 4
-    );
-  };
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      nextNewReleases();
-    }, 8000);
-    return () => clearInterval(interval);
-  }, [newestReleases.length]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      nextTopRated();
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [topRatedReleases.length]);
 
   return (
     <div className="min-h-screen abstract-bg">
@@ -175,216 +154,113 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* New Releases Carousel */}
-      <section className="py-32 relative">
-        <div className="flowing-orb blue morphing-shape w-72 h-72 -top-10 -right-20" style={{animationDelay: '5s'}} />
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-16">
-            <div>
-              <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight">
-                Новые релизы
-              </h2>
-              <p className="text-muted-foreground text-xl font-light">
-                Самые обсуждаемые альбомы недели
-              </p>
+      {/* Dynamic Collections from Admin */}
+      {!collectionsLoading && collections.length > 0 && collections.map((collection, collectionIndex) => (
+        <section key={collection.id} className="py-32 relative">
+          <div className={`flowing-orb ${collectionIndex % 2 === 0 ? 'blue' : 'gray'} ${collectionIndex % 2 === 0 ? 'morphing-shape' : 'wave-animation'} w-72 h-72 ${collectionIndex % 2 === 0 ? '-top-10 -right-20' : '-bottom-10 -left-20'}`} style={{animationDelay: `${collectionIndex * 3}s`}} />
+          
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-16">
+              <div>
+                <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight">
+                  {collection.title}
+                </h2>
+                {(collection.subtitle || collection.description) && (
+                  <p className="text-muted-foreground text-xl font-light">
+                    {collection.subtitle || collection.description}
+                  </p>
+                )}
+              </div>
+              
+              {collection.releases.length > 4 && (
+                <div className="flex space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => prevCollection(collection.id, collection.releases.length)}
+                    className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                    data-testid={`button-prev-${collection.id}`}
+                  >
+                    <ChevronLeft className="w-5 h-5 text-primary" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => nextCollection(collection.id, collection.releases.length)}
+                    className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                    data-testid={`button-next-${collection.id}`}
+                  >
+                    <ChevronRight className="w-5 h-5 text-primary" />
+                  </Button>
+                </div>
+              )}
             </div>
             
-            <div className="flex space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={prevNewReleases}
-                className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
-                data-testid="button-prev-new"
+            <div className="carousel-container">
+              <div 
+                className="carousel-track"
+                style={{
+                  transform: `translateX(-${(collectionIndexes[collection.id] || 0) * (100 / 4)}%)`,
+                }}
               >
-                <ChevronLeft className="w-5 h-5 text-primary" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={nextNewReleases}
-                className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
-                data-testid="button-next-new"
-              >
-                <ChevronRight className="w-5 h-5 text-primary" />
-              </Button>
-            </div>
-          </div>
-          
-          <div className="carousel-container">
-            <div 
-              className="carousel-track"
-              style={{
-                transform: `translateX(-${newReleasesIndex * (100 / 4)}%)`,
-              }}
-            >
-              {newestReleases.map((release, index) => (
-                <div key={release.id} className="carousel-item w-1/4 px-3">
-                  <Card 
-                    className="border-0 shadow-lg smooth-hover bg-card/70 backdrop-blur-sm rounded-2xl overflow-hidden cursor-pointer"
-                    onClick={() => setLocation(`/release/${release.id}`)}
-                  >
-                    <CardContent className="p-0">
-                      <div className="aspect-square overflow-hidden mb-4 relative group">
-                        {release.coverUrl ? (
-                          <img 
-                            src={release.coverUrl} 
-                            alt={`${release.title} cover`}
-                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-all duration-300">
-                            <Music className="w-16 h-16 text-muted-foreground group-hover:text-primary transition-colors" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                          <div className="bg-primary/90 rounded-full p-3 neon-glow">
-                            <Play className="w-6 h-6 text-primary-foreground" />
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="px-4 pb-4">
-                        <h3 className="font-medium text-foreground text-sm mb-1 truncate">
-                          {release.title}
-                        </h3>
-                        <p className="text-muted-foreground text-xs mb-3 truncate">
-                          {release.artist.name}
-                        </p>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-1">
-                            <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                            <span className="text-xs font-medium text-foreground">
-                              {Number(release.averageRating || 0).toFixed(1)}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <MessageCircle className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              {release.commentCount}
-                            </span>
+                {collection.releases.map((release, index) => (
+                  <div key={release.id} className="carousel-item w-1/4 px-3">
+                    <Card 
+                      className="border-0 shadow-lg smooth-hover bg-card/70 backdrop-blur-sm rounded-2xl overflow-hidden cursor-pointer"
+                      onClick={() => setLocation(`/release/${release.id}`)}
+                    >
+                      <CardContent className="p-0">
+                        <div className="aspect-square overflow-hidden mb-4 relative group">
+                          {release.coverUrl ? (
+                            <img 
+                              src={release.coverUrl} 
+                              alt={`${release.title} cover`}
+                              className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-all duration-300">
+                              <Music className="w-16 h-16 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                            <div className="bg-primary/90 rounded-full p-3 neon-glow">
+                              <Play className="w-6 h-6 text-primary-foreground" />
+                            </div>
                           </div>
                         </div>
                         
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Top Rated Carousel */}
-      <section className="py-32 relative">
-        <div className="flowing-orb gray wave-animation w-80 h-80 -bottom-10 -left-20" style={{animationDelay: '2s'}} />
-        
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-16">
-            <div>
-              <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight">
-                Лучшие оценки
-              </h2>
-              <p className="text-muted-foreground text-xl font-light">
-                Высоко оценённые сообществом
-              </p>
-            </div>
-            
-            <div className="flex space-x-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={prevTopRated}
-                className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
-                data-testid="button-prev-top"
-              >
-                <ChevronLeft className="w-5 h-5 text-primary" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={nextTopRated}
-                className="rounded-full w-12 h-12 p-0 smooth-hover border border-primary/20 hover:border-primary/40 hover:bg-primary/5"
-                data-testid="button-next-top"
-              >
-                <ChevronRight className="w-5 h-5 text-primary" />
-              </Button>
-            </div>
-          </div>
-          
-          <div className="carousel-container">
-            <div 
-              className="carousel-track"
-              style={{
-                transform: `translateX(-${topRatedIndex * (100 / 4)}%)`,
-              }}
-            >
-              {topRatedReleases.map((release, index) => (
-                <div key={release.id} className="carousel-item w-1/4 px-3">
-                  <Card 
-                    className="border-0 shadow-lg smooth-hover bg-card/80 backdrop-blur-sm rounded-2xl overflow-hidden cursor-pointer"
-                    onClick={() => setLocation(`/release/${release.id}`)}
-                  >
-                    <CardContent className="p-0">
-                      <div className="aspect-square overflow-hidden mb-4 relative group">
-                        {release.coverUrl ? (
-                          <img 
-                            src={release.coverUrl} 
-                            alt={`${release.title} cover`}
-                            className="w-full h-full object-cover transition-all duration-500 group-hover:scale-110"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-all duration-300">
-                            <Music className="w-16 h-16 text-muted-foreground group-hover:text-primary transition-colors" />
-                          </div>
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                          <div className="bg-primary/90 rounded-full p-3 neon-glow">
-                            <Play className="w-6 h-6 text-primary-foreground" />
+                        <div className="px-4 pb-4">
+                          <h3 className="font-medium text-foreground text-sm mb-1 truncate">
+                            {release.title}
+                          </h3>
+                          <p className="text-muted-foreground text-xs mb-3 truncate">
+                            {release.artist.name}
+                          </p>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-1">
+                              <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                              <span className="text-xs font-medium text-foreground">
+                                {Number(release.averageRating || 0).toFixed(1)}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <MessageCircle className="w-3 h-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">
+                                {release.commentCount}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        <div className="absolute top-4 right-4 bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-full text-sm font-medium neon-glow">
-                          {Number(release.averageRating || 0).toFixed(1)}
-                        </div>
-                      </div>
-                      
-                      <div className="px-4 pb-4">
-                        <h3 className="font-medium text-foreground text-sm mb-1 truncate">
-                          {release.title}
-                        </h3>
-                        <p className="text-muted-foreground text-xs mb-3 truncate">
-                          {release.artist.name}
-                        </p>
-                        
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star 
-                                key={i} 
-                                className={`w-3 h-3 ${i < Math.round(Number(release.averageRating || 0) / 2) ? 'text-yellow-500 fill-current' : 'text-muted-foreground'}`} 
-                              />
-                            ))}
-                          </div>
-                          <div className="flex items-center space-x-1">
-                            <MessageCircle className="w-3 h-3 text-muted-foreground" />
-                            <span className="text-xs text-muted-foreground">
-                              {release.commentCount}
-                            </span>
-                          </div>
-                        </div>
-                        
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              ))}
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ))}
 
       {/* Footer CTA */}
       <section className="py-40 relative">
