@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Trash2, X, Shield, Upload, Download, Database } from "lucide-react";
+import { AlertTriangle, Trash2, X, Shield, Upload, Download, Database, Calendar, User } from "lucide-react";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 export default function Admin() {
   const { user, isLoading: authLoading } = useAuth();
@@ -444,7 +445,9 @@ export default function Admin() {
 function MusicImportTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [importMode, setImportMode] = useState<'artists' | 'years'>('artists');
   const [artistList, setArtistList] = useState('');
+  const [yearsList, setYearsList] = useState('');
   const [importStats, setImportStats] = useState<{ totalReleases: number; totalArtists: number } | null>(null);
 
   // Fetch import stats
@@ -457,9 +460,15 @@ function MusicImportTab() {
   });
 
   const importMutation = useMutation({
-    mutationFn: async (artists: string[]) => {
-      const response = await apiRequest('POST', '/api/admin/import', { artists });
-      return response.json();
+    mutationFn: async (data: { artists?: string[]; years?: number[] }) => {
+      if (data.artists) {
+        const response = await apiRequest('POST', '/api/admin/import', { artists: data.artists });
+        return response.json();
+      } else if (data.years) {
+        const response = await apiRequest('POST', '/api/admin/import/years', { years: data.years });
+        return response.json();
+      }
+      throw new Error('Invalid import data');
     },
     onSuccess: (result) => {
       toast({
@@ -467,6 +476,7 @@ function MusicImportTab() {
         description: `Импортировано ${result.success} релизов. ${result.errors.length > 0 ? `${result.errors.length} ошибок.` : ''}`,
       });
       setArtistList('');
+      setYearsList('');
       queryClient.invalidateQueries({ queryKey: ["/api/admin/import/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/releases"] });
     },
@@ -491,21 +501,39 @@ function MusicImportTab() {
   });
 
   const handleImport = () => {
-    const artists = artistList
-      .split('\n')
-      .map(artist => artist.trim())
-      .filter(artist => artist.length > 0);
-    
-    if (artists.length === 0) {
-      toast({
-        title: "Пустой список",
-        description: "Введите имена исполнителей для импорта",
-        variant: "destructive",
-      });
-      return;
+    if (importMode === 'artists') {
+      const artists = artistList
+        .split('\n')
+        .map(artist => artist.trim())
+        .filter(artist => artist.length > 0);
+      
+      if (artists.length === 0) {
+        toast({
+          title: "Пустой список",
+          description: "Введите имена исполнителей для импорта",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      importMutation.mutate({ artists });
+    } else {
+      const years = yearsList
+        .split('\n')
+        .map(year => parseInt(year.trim()))
+        .filter(year => !isNaN(year) && year >= 1900 && year <= new Date().getFullYear());
+      
+      if (years.length === 0) {
+        toast({
+          title: "Некорректные годы",
+          description: "Введите годы в диапазоне от 1900 до текущего года",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      importMutation.mutate({ years });
     }
-    
-    importMutation.mutate(artists);
   };
 
   return (
@@ -537,37 +565,88 @@ function MusicImportTab() {
         <CardContent className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Upload className="w-5 h-5 text-primary" />
-            <h3 className="text-lg font-semibold text-foreground">Массовый импорт исполнителей</h3>
+            <h3 className="text-lg font-semibold text-foreground">Массовый импорт релизов</h3>
+          </div>
+          
+          {/* Import Mode Selection */}
+          <div className="space-y-4 mb-6">
+            <Label>Режим импорта</Label>
+            <RadioGroup value={importMode} onValueChange={(value: 'artists' | 'years') => setImportMode(value)} className="flex gap-6">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="artists" id="artists-mode" />
+                <Label htmlFor="artists-mode" className="flex items-center gap-2 cursor-pointer">
+                  <User className="w-4 h-4" />
+                  По исполнителям
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="years" id="years-mode" />
+                <Label htmlFor="years-mode" className="flex items-center gap-2 cursor-pointer">
+                  <Calendar className="w-4 h-4" />
+                  По годам выпуска
+                </Label>
+              </div>
+            </RadioGroup>
           </div>
           
           <Alert className="mb-4">
             <Download className="h-4 w-4" />
             <AlertDescription>
-              <strong>Как это работает:</strong> Введите имена исполнителей (по одному на строку). 
-              Система автоматически загрузит все их релизы из MusicBrainz, включая обложки альбомов.
-              Процесс может занять некоторое время из-за ограничений API (1 запрос в секунду).
+              {importMode === 'artists' ? (
+                <>
+                  <strong>Импорт по исполнителям:</strong> Введите имена исполнителей (по одному на строку). 
+                  Система загрузит все их релизы из MusicBrainz, включая обложки альбомов.
+                </>
+              ) : (
+                <>
+                  <strong>Импорт по годам:</strong> Введите годы выпуска (по одному на строку). 
+                  Система найдет популярные релизы разных исполнителей за указанные годы.
+                </>
+              )}
+              <br />Процесс может занять время из-за ограничений API (1 запрос в секунду).
             </AlertDescription>
           </Alert>
 
           <div className="space-y-4">
-            <Label htmlFor="artists">Список исполнителей (по одному на строку)</Label>
-            <Textarea
-              id="artists"
-              value={artistList}
-              onChange={(e) => setArtistList(e.target.value)}
-              placeholder={`Radiohead
+            {importMode === 'artists' ? (
+              <>
+                <Label htmlFor="artists">Список исполнителей (по одному на строку)</Label>
+                <Textarea
+                  id="artists"
+                  value={artistList}
+                  onChange={(e) => setArtistList(e.target.value)}
+                  placeholder={`Radiohead
 The Beatles
 Pink Floyd
 Queen
 Led Zeppelin`}
-              rows={10}
-              className="font-mono"
-              data-testid="textarea-artists"
-            />
+                  rows={10}
+                  className="font-mono"
+                  data-testid="textarea-artists"
+                />
+              </>
+            ) : (
+              <>
+                <Label htmlFor="years">Список годов (по одному на строку)</Label>
+                <Textarea
+                  id="years"
+                  value={yearsList}
+                  onChange={(e) => setYearsList(e.target.value)}
+                  placeholder={`2024
+2023
+2022
+2021
+2020`}
+                  rows={10}
+                  className="font-mono"
+                  data-testid="textarea-years"
+                />
+              </>
+            )}
             
             <Button
               onClick={handleImport}
-              disabled={importMutation.isPending || !artistList.trim()}
+              disabled={importMutation.isPending || (importMode === 'artists' ? !artistList.trim() : !yearsList.trim())}
               className="w-full"
               data-testid="button-import"
             >
@@ -579,7 +658,10 @@ Led Zeppelin`}
               ) : (
                 <>
                   <Upload className="w-4 h-4 mr-2" />
-                  Импортировать релизы ({artistList.split('\n').filter(s => s.trim()).length} исполнителей)
+                  {importMode === 'artists' 
+                    ? `Импортировать релизы (${artistList.split('\n').filter(s => s.trim()).length} исполнителей)`
+                    : `Импортировать релизы (${yearsList.split('\n').filter(s => s.trim()).length} годов)`
+                  }
                 </>
               )}
             </Button>

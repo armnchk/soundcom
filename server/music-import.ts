@@ -170,6 +170,97 @@ export class MusicBrainzImporter {
     
     return importedReleases;
   }
+
+  /**
+   * Поиск релизов по году выпуска
+   */
+  async getReleasesByYear(year: number): Promise<MusicBrainzRelease[]> {
+    try {
+      console.log(`🔍 Поиск релизов за ${year} год...`);
+      
+      // Поиск популярных релизов за определенный год
+      const query = `date:${year} AND type:album`;
+      const data = await this.makeRequest(`/release/?query=${encodeURIComponent(query)}&fmt=json&limit=50`);
+      
+      if (data.releases && data.releases.length > 0) {
+        console.log(`📀 Найдено ${data.releases.length} релизов за ${year} год`);
+        return data.releases.filter((release: any) => 
+          release.date && release.date.includes(year.toString())
+        );
+      }
+      
+      return [];
+    } catch (error) {
+      console.error(`Error getting releases by year ${year}:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Получить информацию об исполнителе по ID релиза
+   */
+  async getArtistFromRelease(releaseMbid: string): Promise<MusicBrainzArtist | null> {
+    try {
+      const data = await this.makeRequest(`/release/${releaseMbid}?fmt=json&inc=artists`);
+      
+      if (data['artist-credit'] && data['artist-credit'].length > 0) {
+        return data['artist-credit'][0].artist;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error getting artist from release:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Импорт релизов по году выпуска
+   */
+  async importReleasesByYear(year: number): Promise<ImportedRelease[]> {
+    console.log(`📅 Импорт релизов ${year} года...`);
+    
+    // 1. Получить релизы за указанный год
+    const releases = await this.getReleasesByYear(year);
+    console.log(`📀 Найдено релизов: ${releases.length}`);
+    
+    if (releases.length === 0) {
+      return [];
+    }
+    
+    // 2. Обработать каждый релиз
+    const importedReleases: ImportedRelease[] = [];
+    
+    for (const release of releases) {
+      try {
+        // Получить информацию об исполнителе
+        const artist = await this.getArtistFromRelease(release.id);
+        if (!artist) {
+          console.log(`⚠️ Не найден исполнитель для релиза: ${release.title}`);
+          continue;
+        }
+        
+        // Получить обложку
+        const coverUrl = await this.getCoverArtUrl(release.id);
+        
+        const importedRelease: ImportedRelease = {
+          artist: artist.name,
+          album: release.title,
+          releaseDate: release.date || `${year}-01-01`,
+          coverUrl: coverUrl || undefined,
+          trackCount: release.media?.[0]?.['track-count']
+        };
+        
+        importedReleases.push(importedRelease);
+        console.log(`💽 Импортирован: ${artist.name} - ${release.title}`);
+        
+      } catch (error) {
+        console.error(`❌ Ошибка импорта релиза ${release.title}:`, error);
+      }
+    }
+    
+    return importedReleases;
+  }
 }
 
 /**
@@ -200,6 +291,38 @@ export class MassImportService {
         
       } catch (error) {
         const errorMsg = `Ошибка импорта ${artistName}: ${error}`;
+        errors.push(errorMsg);
+        console.error(errorMsg);
+      }
+    }
+    
+    return { success: successCount, errors };
+  }
+
+  /**
+   * Импорт релизов по годам выпуска
+   */
+  async importByYears(years: number[]): Promise<{ success: number; errors: string[] }> {
+    let successCount = 0;
+    const errors: string[] = [];
+    
+    for (const year of years) {
+      try {
+        console.log(`🗓️ Импорт релизов ${year} года...`);
+        
+        // 1. Получить релизы из MusicBrainz по году
+        const releases = await this.musicBrainz.importReleasesByYear(year);
+        
+        // 2. Сохранить в нашу БД
+        for (const release of releases) {
+          await this.saveReleaseToDatabase(release);
+        }
+        
+        successCount += releases.length;
+        console.log(`✅ Успешно импортировано ${releases.length} релизов за ${year} год`);
+        
+      } catch (error) {
+        const errorMsg = `Ошибка импорта за ${year} год: ${error}`;
         errors.push(errorMsg);
         console.error(errorMsg);
       }

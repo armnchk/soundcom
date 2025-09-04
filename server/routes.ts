@@ -407,7 +407,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Mass import endpoint for admin
+  // Mass import endpoint for admin (by artists)
   app.post('/api/admin/import', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -427,6 +427,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error importing artists:", error);
       res.status(500).json({ message: "Failed to import artists" });
+    }
+  });
+
+  // Mass import endpoint for admin (by years)
+  app.post('/api/admin/import/years', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const { years } = req.body;
+      if (!years || !Array.isArray(years)) {
+        return res.status(400).json({ message: "Years array is required" });
+      }
+
+      // Validate years are numbers
+      const validYears = years.filter((year: any) => 
+        typeof year === 'number' && year >= 1900 && year <= new Date().getFullYear()
+      );
+
+      if (validYears.length === 0) {
+        return res.status(400).json({ message: "Valid years (1900-current) are required" });
+      }
+
+      const result = await massImportService.importByYears(validYears);
+      res.json(result);
+    } catch (error) {
+      console.error("Error importing by years:", error);
+      res.status(500).json({ message: "Failed to import by years" });
     }
   });
 
