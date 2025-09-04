@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { massImportService } from "./music-import";
 import { 
   insertArtistSchema, 
   insertReleaseSchema, 
@@ -403,6 +404,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating report:", error);
       res.status(500).json({ message: "Failed to update report" });
+    }
+  });
+
+  // Mass import endpoint for admin
+  app.post('/api/admin/import', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const { artists } = req.body;
+      if (!artists || !Array.isArray(artists)) {
+        return res.status(400).json({ message: "Artists array is required" });
+      }
+
+      const result = await massImportService.importArtists(artists);
+      res.json(result);
+    } catch (error) {
+      console.error("Error importing artists:", error);
+      res.status(500).json({ message: "Failed to import artists" });
+    }
+  });
+
+  // Import stats endpoint for admin
+  app.get('/api/admin/import/stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const stats = await massImportService.getImportStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching import stats:", error);
+      res.status(500).json({ message: "Failed to fetch import stats" });
     }
   });
 

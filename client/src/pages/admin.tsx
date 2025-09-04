@@ -8,17 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Trash2, X, Shield } from "lucide-react";
+import { AlertTriangle, Trash2, X, Shield, Upload, Download, Database } from "lucide-react";
 import { useState } from "react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { Textarea } from "@/components/ui/textarea";
 
 export default function Admin() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'releases' | 'reports' | 'users'>('releases');
+  const [activeTab, setActiveTab] = useState<'releases' | 'reports' | 'users' | 'import'>('releases');
   const [releaseForm, setReleaseForm] = useState({
     title: '',
     artistName: '',
@@ -243,6 +244,13 @@ export default function Admin() {
           >
             User Management
           </Button>
+          <Button
+            variant={activeTab === 'import' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('import')}
+            data-testid="tab-import"
+          >
+            Импорт релизов
+          </Button>
         </div>
 
         {/* Manage Releases Tab */}
@@ -420,9 +428,189 @@ export default function Admin() {
             </CardContent>
           </Card>
         )}
+
+        {/* Music Import Tab */}
+        {activeTab === 'import' && (
+          <MusicImportTab />
+        )}
       </main>
 
       <Footer />
+    </div>
+  );
+}
+
+// Music Import Tab Component
+function MusicImportTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [artistList, setArtistList] = useState('');
+  const [importStats, setImportStats] = useState<{ totalReleases: number; totalArtists: number } | null>(null);
+
+  // Fetch import stats
+  const { data: stats } = useQuery({
+    queryKey: ["/api/admin/import/stats"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/admin/import/stats');
+      return response.json();
+    },
+  });
+
+  const importMutation = useMutation({
+    mutationFn: async (artists: string[]) => {
+      const response = await apiRequest('POST', '/api/admin/import', { artists });
+      return response.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Импорт завершен",
+        description: `Импортировано ${result.success} релизов. ${result.errors.length > 0 ? `${result.errors.length} ошибок.` : ''}`,
+      });
+      setArtistList('');
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/import/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/releases"] });
+    },
+    onError: (error) => {
+      if (isUnauthorizedError(error)) {
+        toast({
+          title: "Не авторизован",
+          description: "Вы вышли из системы. Заходим заново...",
+          variant: "destructive",
+        });
+        setTimeout(() => {
+          window.location.href = "/api/login";
+        }, 500);
+        return;
+      }
+      toast({
+        title: "Ошибка импорта",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleImport = () => {
+    const artists = artistList
+      .split('\n')
+      .map(artist => artist.trim())
+      .filter(artist => artist.length > 0);
+    
+    if (artists.length === 0) {
+      toast({
+        title: "Пустой список",
+        description: "Введите имена исполнителей для импорта",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    importMutation.mutate(artists);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Import Stats */}
+      {stats && (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Database className="w-5 h-5 text-primary" />
+              <h3 className="text-lg font-semibold text-foreground">Статистика базы данных</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-4 bg-secondary/50 rounded-lg">
+                <p className="text-2xl font-bold text-primary">{stats.totalReleases}</p>
+                <p className="text-sm text-muted-foreground">Всего релизов</p>
+              </div>
+              <div className="text-center p-4 bg-secondary/50 rounded-lg">
+                <p className="text-2xl font-bold text-primary">{stats.totalArtists}</p>
+                <p className="text-sm text-muted-foreground">Всего артистов</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Mass Import Form */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Upload className="w-5 h-5 text-primary" />
+            <h3 className="text-lg font-semibold text-foreground">Массовый импорт исполнителей</h3>
+          </div>
+          
+          <Alert className="mb-4">
+            <Download className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Как это работает:</strong> Введите имена исполнителей (по одному на строку). 
+              Система автоматически загрузит все их релизы из MusicBrainz, включая обложки альбомов.
+              Процесс может занять некоторое время из-за ограничений API (1 запрос в секунду).
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-4">
+            <Label htmlFor="artists">Список исполнителей (по одному на строку)</Label>
+            <Textarea
+              id="artists"
+              value={artistList}
+              onChange={(e) => setArtistList(e.target.value)}
+              placeholder={`Radiohead
+The Beatles
+Pink Floyd
+Queen
+Led Zeppelin`}
+              rows={10}
+              className="font-mono"
+              data-testid="textarea-artists"
+            />
+            
+            <Button
+              onClick={handleImport}
+              disabled={importMutation.isPending || !artistList.trim()}
+              className="w-full"
+              data-testid="button-import"
+            >
+              {importMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Импортирую...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Импортировать релизы ({artistList.split('\n').filter(s => s.trim()).length} исполнителей)
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Import Information */}
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Информация о системе импорта</h3>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div className="flex items-start gap-2">
+              <span className="text-green-500 font-bold">✓</span>
+              <span><strong>MusicBrainz API:</strong> Полностью бесплатный и легальный источник метаданных</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-green-500 font-bold">✓</span>
+              <span><strong>Cover Art Archive:</strong> Официальные обложки альбомов</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold">ℹ</span>
+              <span><strong>Ограничения:</strong> 1 запрос в секунду для соблюдения правил API</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="text-blue-500 font-bold">ℹ</span>
+              <span><strong>Дубликаты:</strong> Система автоматически проверяет и пропускает существующие релизы</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

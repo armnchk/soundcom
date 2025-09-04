@@ -33,11 +33,13 @@ export interface IStorage {
   // Artist operations
   getArtists(): Promise<Artist[]>;
   getArtist(id: number): Promise<Artist | undefined>;
+  getArtistByName(name: string): Promise<Artist | undefined>;
   createArtist(artist: InsertArtist): Promise<Artist>;
   
   // Release operations
   getReleases(filters?: { genre?: string; year?: number; artistId?: number }): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number })[]>;
   getRelease(id: number): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number }) | undefined>;
+  getReleaseByTitleAndArtist(title: string, artistId: number): Promise<Release | undefined>;
   createRelease(release: InsertRelease): Promise<Release>;
   updateRelease(id: number, release: Partial<InsertRelease>): Promise<Release>;
   deleteRelease(id: number): Promise<void>;
@@ -111,6 +113,11 @@ export class DatabaseStorage implements IStorage {
 
   async getArtist(id: number): Promise<Artist | undefined> {
     const [artist] = await db.select().from(artists).where(eq(artists.id, id));
+    return artist;
+  }
+
+  async getArtistByName(name: string): Promise<Artist | undefined> {
+    const [artist] = await db.select().from(artists).where(eq(artists.name, name));
     return artist;
   }
 
@@ -188,6 +195,14 @@ export class DatabaseStorage implements IStorage {
       .groupBy(releases.id, artists.id);
 
     return result as (Release & { artist: Artist; averageRating: number; commentCount: number }) | undefined;
+  }
+
+  async getReleaseByTitleAndArtist(title: string, artistId: number): Promise<Release | undefined> {
+    const [release] = await db
+      .select()
+      .from(releases)
+      .where(and(eq(releases.title, title), eq(releases.artistId, artistId)));
+    return release;
   }
 
   async createRelease(release: InsertRelease): Promise<Release> {
