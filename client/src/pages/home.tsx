@@ -24,8 +24,8 @@ interface ReleaseWithDetails {
 export default function Home() {
   const [, setLocation] = useLocation();
   const [filters, setFilters] = useState({
-    genre: "",
-    year: "",
+    genre: "all",
+    year: "all",
   });
 
   const { data: releases = [], isLoading } = useQuery<ReleaseWithDetails[]>({
@@ -34,8 +34,8 @@ export default function Home() {
       const [, filterParams] = queryKey as [string, typeof filters];
       const params = new URLSearchParams();
       
-      if (filterParams.genre) params.append('genre', filterParams.genre);
-      if (filterParams.year) params.append('year', filterParams.year);
+      if (filterParams.genre && filterParams.genre !== 'all') params.append('genre', filterParams.genre);
+      if (filterParams.year && filterParams.year !== 'all') params.append('year', filterParams.year);
       
       const response = await fetch(`/api/releases?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch releases');
@@ -53,7 +53,7 @@ export default function Home() {
   };
 
   const clearFilters = () => {
-    setFilters({ genre: "", year: "" });
+    setFilters({ genre: "all", year: "all" });
   };
 
   if (isLoading) {
@@ -116,7 +116,7 @@ export default function Home() {
                   <SelectValue placeholder="All Genres" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Genres</SelectItem>
+                  <SelectItem value="all">All Genres</SelectItem>
                   <SelectItem value="rock">Rock</SelectItem>
                   <SelectItem value="pop">Pop</SelectItem>
                   <SelectItem value="hip-hop">Hip-Hop</SelectItem>
@@ -130,7 +130,7 @@ export default function Home() {
                   <SelectValue placeholder="All Years" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Years</SelectItem>
+                  <SelectItem value="all">All Years</SelectItem>
                   <SelectItem value="2024">2024</SelectItem>
                   <SelectItem value="2023">2023</SelectItem>
                   <SelectItem value="2022">2022</SelectItem>
@@ -138,7 +138,7 @@ export default function Home() {
                 </SelectContent>
               </Select>
 
-              {(filters.genre || filters.year) && (
+              {(filters.genre !== 'all' || filters.year !== 'all') && (
                 <Button
                   variant="ghost"
                   onClick={clearFilters}
