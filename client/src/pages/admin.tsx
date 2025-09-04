@@ -981,22 +981,18 @@ function CollectionsTab() {
   // Fetch collections
   const { data: collections, isLoading: collectionsLoading } = useQuery({
     queryKey: ['/api/collections?activeOnly=false'],
-    queryFn: () => apiRequest('/api/collections?activeOnly=false'),
+    queryFn: () => apiRequest('GET', '/api/collections?activeOnly=false').then(res => res.json()),
   });
 
   // Fetch all releases for selection
   const { data: allReleases } = useQuery({
     queryKey: ['/api/releases'],
-    queryFn: () => apiRequest('/api/releases'),
+    queryFn: () => apiRequest('GET', '/api/releases').then(res => res.json()),
   });
 
   // Create collection mutation
   const createCollectionMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('/api/collections', {
-      method: 'POST',
-      body: JSON.stringify(data),
-      headers: { 'Content-Type': 'application/json' }
-    }),
+    mutationFn: (data: any) => apiRequest('POST', '/api/collections', data),
     onSuccess: () => {
       toast({ title: "Подборка создана успешно" });
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
@@ -1014,11 +1010,7 @@ function CollectionsTab() {
 
   // Update collection mutation
   const updateCollectionMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number, data: any }) => apiRequest(`/api/collections/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-      headers: { 'Content-Type': 'application/json' }
-    }),
+    mutationFn: ({ id, data }: { id: number, data: any }) => apiRequest('PUT', `/api/collections/${id}`, data),
     onSuccess: () => {
       toast({ title: "Подборка обновлена успешно" });
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
@@ -1036,7 +1028,7 @@ function CollectionsTab() {
 
   // Delete collection mutation
   const deleteCollectionMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/collections/${id}`, { method: 'DELETE' }),
+    mutationFn: (id: number) => apiRequest('DELETE', `/api/collections/${id}`),
     onSuccess: () => {
       toast({ title: "Подборка удалена успешно" });
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
@@ -1053,11 +1045,7 @@ function CollectionsTab() {
   // Add release to collection mutation
   const addReleaseMutation = useMutation({
     mutationFn: ({ collectionId, releaseId, sortOrder }: { collectionId: number, releaseId: number, sortOrder: number }) => 
-      apiRequest(`/api/collections/${collectionId}/releases`, {
-        method: 'POST',
-        body: JSON.stringify({ releaseId, sortOrder }),
-        headers: { 'Content-Type': 'application/json' }
-      }),
+      apiRequest('POST', `/api/collections/${collectionId}/releases`, { releaseId, sortOrder }),
     onSuccess: () => {
       toast({ title: "Релиз добавлен в подборку" });
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
@@ -1075,7 +1063,7 @@ function CollectionsTab() {
   // Remove release from collection mutation
   const removeReleaseMutation = useMutation({
     mutationFn: ({ collectionId, releaseId }: { collectionId: number, releaseId: number }) =>
-      apiRequest(`/api/collections/${collectionId}/releases/${releaseId}`, { method: 'DELETE' }),
+      apiRequest('DELETE', `/api/collections/${collectionId}/releases/${releaseId}`),
     onSuccess: () => {
       toast({ title: "Релиз удален из подборки" });
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
@@ -1091,7 +1079,7 @@ function CollectionsTab() {
 
   // Initialize system collections mutation
   const initializeSystemCollectionsMutation = useMutation({
-    mutationFn: () => apiRequest('/api/collections/initialize-system', { method: 'POST' }),
+    mutationFn: () => apiRequest('POST', '/api/collections/initialize-system'),
     onSuccess: () => {
       toast({ title: "Системные подборки созданы успешно" });
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
@@ -1108,7 +1096,7 @@ function CollectionsTab() {
   // Update system collection mutation
   const updateSystemCollectionMutation = useMutation({
     mutationFn: (type: 'latest' | 'most_discussed') => 
-      apiRequest(`/api/collections/update-system/${type}`, { method: 'POST' }),
+      apiRequest('POST', `/api/collections/update-system/${type}`),
     onSuccess: (_, type) => {
       toast({ title: `Системная подборка "${type === 'latest' ? 'Новые релизы' : 'Популярные'}" обновлена` });
       queryClient.invalidateQueries({ queryKey: ['/api/collections'] });
