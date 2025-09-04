@@ -178,9 +178,9 @@ export default function Landing() {
         <div className="flowing-orb blue morphing-shape w-72 h-72 -top-10 -right-20" style={{animationDelay: '5s'}} />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-16 hero-animation">
+          <div className="flex items-center justify-between mb-16">
             <div>
-              <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight text-glow">
+              <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight">
                 Новые релизы
               </h2>
               <p className="text-muted-foreground text-xl font-light">
@@ -286,9 +286,9 @@ export default function Landing() {
         <div className="flowing-orb gray wave-animation w-80 h-80 -bottom-10 -left-20" style={{animationDelay: '2s'}} />
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between mb-16 hero-animation">
+          <div className="flex items-center justify-between mb-16">
             <div>
-              <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight text-glow">
+              <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-4 tracking-tight">
                 Лучшие оценки
               </h2>
               <p className="text-muted-foreground text-xl font-light">
@@ -399,11 +399,11 @@ export default function Landing() {
         <div className="flowing-orb blue morphing-shape w-96 h-96 top-10 left-1/2 -translate-x-1/2" style={{animationDelay: '10s'}} />
         
         <div className="max-w-5xl mx-auto text-center px-4 sm:px-6 lg:px-8">
-          <div className="hero-animation">
+          <div>
             <div className="w-20 h-20 bg-primary/20 rounded-3xl flex items-center justify-center mx-auto mb-8 neon-glow">
-              <Music className="w-10 h-10 text-primary float-animation" />
+              <Music className="w-10 h-10 text-primary" />
             </div>
-            <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-6 tracking-tight text-glow">
+            <h2 className="text-5xl md:text-6xl font-extralight text-foreground mb-6 tracking-tight">
               Начните своё музыкальное путешествие
             </h2>
             <p className="text-xl md:text-2xl text-muted-foreground mb-16 leading-relaxed max-w-3xl mx-auto font-light">
