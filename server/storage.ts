@@ -121,6 +121,16 @@ export class DatabaseStorage implements IStorage {
 
   // Release operations
   async getReleases(filters?: { genre?: string; year?: number; artistId?: number }): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number })[]> {
+    const whereConditions = [];
+    
+    if (filters?.artistId) {
+      whereConditions.push(eq(releases.artistId, filters.artistId));
+    }
+    
+    if (filters?.year) {
+      whereConditions.push(sql`EXTRACT(YEAR FROM ${releases.releaseDate}) = ${filters.year}`);
+    }
+
     let query = db
       .select({
         id: releases.id,
@@ -144,12 +154,8 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(comments, eq(releases.id, comments.releaseId))
       .groupBy(releases.id, artists.id);
 
-    if (filters?.artistId) {
-      query = query.where(eq(releases.artistId, filters.artistId));
-    }
-
-    if (filters?.year) {
-      query = query.where(sql`EXTRACT(YEAR FROM ${releases.releaseDate}) = ${filters.year}`);
+    if (whereConditions.length > 0) {
+      query = query.where(and(...whereConditions));
     }
 
     const result = await query.orderBy(desc(releases.createdAt));

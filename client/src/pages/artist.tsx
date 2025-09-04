@@ -6,18 +6,19 @@ import { ReleaseCard } from "@/components/release/release-card";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Music, ArrowLeft } from "lucide-react";
+import type { Artist, Release } from "@shared/schema";
 
 export default function Artist() {
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const artistId = parseInt(id || '0');
 
-  const { data: artist, isLoading: artistLoading } = useQuery({
+  const { data: artist, isLoading: artistLoading } = useQuery<Artist>({
     queryKey: ["/api/artists", artistId],
     enabled: !!artistId,
   });
 
-  const { data: releases = [], isLoading: releasesLoading } = useQuery({
+  const { data: releases = [], isLoading: releasesLoading } = useQuery<(Release & { artist: Artist; averageRating: number; commentCount: number })[]>({
     queryKey: ["/api/releases", { artistId }],
     enabled: !!artistId,
     queryFn: async ({ queryKey }) => {

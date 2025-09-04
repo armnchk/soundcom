@@ -5,8 +5,7 @@ import type {
   Rating, 
   Comment, 
   CommentReaction,
-  Report,
-  Subscription 
+  Report 
 } from "@shared/schema";
 
 export interface ReleaseWithDetails extends Release {

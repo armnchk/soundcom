@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useState } from "react";
+import type { Release, Artist, Rating } from "@shared/schema";
 
 export default function Release() {
   const { id } = useParams<{ id: string }>();
@@ -27,12 +28,12 @@ export default function Release() {
 
   const releaseId = parseInt(id || '0');
 
-  const { data: release, isLoading } = useQuery({
+  const { data: release, isLoading } = useQuery<Release & { artist: Artist; averageRating: number; commentCount: number }>({
     queryKey: ["/api/releases", releaseId],
     enabled: !!releaseId,
   });
 
-  const { data: currentUserRating } = useQuery({
+  const { data: currentUserRating } = useQuery<Rating>({
     queryKey: ["/api/releases", releaseId, "user-rating"],
     enabled: !!releaseId && isAuthenticated,
   });

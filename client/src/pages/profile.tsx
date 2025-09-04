@@ -11,6 +11,7 @@ import { StarRating } from "@/components/release/rating-display";
 import { Music, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import type { User, Rating, Comment, Release, Artist } from "@shared/schema";
 
 export default function Profile() {
   const { id } = useParams<{ id?: string }>();
@@ -35,17 +36,17 @@ export default function Profile() {
     }
   }, [authLoading, isAuthenticated, toast]);
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading } = useQuery<User>({
     queryKey: ["/api/auth/user"],
     enabled: !!profileUserId && isAuthenticated,
   });
 
-  const { data: userRatings = [] } = useQuery({
+  const { data: userRatings = [] } = useQuery<(Rating & { release: Release & { artist: Artist } })[]>({
     queryKey: ["/api/users", profileUserId, "ratings"],
     enabled: !!profileUserId && activeTab === 'ratings',
   });
 
-  const { data: userComments = [] } = useQuery({
+  const { data: userComments = [] } = useQuery<(Comment & { release: Release & { artist: Artist } })[]>({
     queryKey: ["/api/users", profileUserId, "comments"],
     enabled: !!profileUserId && activeTab === 'reviews',
   });
