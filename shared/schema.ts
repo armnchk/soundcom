@@ -52,6 +52,7 @@ export const releases = pgTable("releases", {
   releaseDate: timestamp("release_date"),
   coverUrl: text("cover_url"),
   streamingLinks: jsonb("streaming_links"),
+  isTestData: boolean("is_test_data").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

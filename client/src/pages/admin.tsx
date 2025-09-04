@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 
 export default function Admin() {
   const { user, isLoading: authLoading } = useAuth();
@@ -29,6 +30,10 @@ export default function Admin() {
     spotifyUrl: '',
     appleMusicUrl: ''
   });
+  const [showTestData, setShowTestData] = useState(() => {
+    const saved = localStorage.getItem('showTestData');
+    return saved === 'true';
+  });
 
   useEffect(() => {
     if (!authLoading && (!user || !user.isAdmin)) {
@@ -42,6 +47,13 @@ export default function Admin() {
       }, 2000);
     }
   }, [authLoading, user, toast]);
+
+  // Save test data preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('showTestData', showTestData.toString());
+    // Invalidate releases queries to refetch with new setting
+    queryClient.invalidateQueries({ queryKey: ["/api/releases"] });
+  }, [showTestData, queryClient]);
 
   const { data: reports = [] } = useQuery({
     queryKey: ["/api/admin/reports", { status: 'pending' }],
@@ -258,6 +270,25 @@ export default function Admin() {
         {activeTab === 'releases' && (
           <Card>
             <CardContent className="p-6">
+              {/* Test Data Toggle */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b">
+                <div>
+                  <h3 className="text-lg font-semibold text-foreground">Настройки отображения</h3>
+                  <p className="text-sm text-muted-foreground">Управление видимостью тестовых данных</p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Label htmlFor="show-test-data" className="text-sm font-medium">
+                    Показывать тестовые релизы
+                  </Label>
+                  <Switch
+                    id="show-test-data"
+                    checked={showTestData}
+                    onCheckedChange={setShowTestData}
+                    data-testid="switch-show-test-data"
+                  />
+                </div>
+              </div>
+
               <h3 className="text-lg font-semibold text-foreground mb-4">Add New Release</h3>
               
               <form onSubmit={handleReleaseSubmit} className="space-y-4">

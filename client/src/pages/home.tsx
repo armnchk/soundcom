@@ -37,6 +37,10 @@ export default function Home() {
       if (filterParams.genre && filterParams.genre !== 'all') params.append('genre', filterParams.genre);
       if (filterParams.year && filterParams.year !== 'all') params.append('year', filterParams.year);
       
+      // Check if admin wants to show test data
+      const showTestData = localStorage.getItem('showTestData') === 'true';
+      if (showTestData) params.append('includeTestData', 'true');
+      
       const response = await fetch(`/api/releases?${params.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch releases');
       return response.json();

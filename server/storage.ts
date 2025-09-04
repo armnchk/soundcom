@@ -127,8 +127,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Release operations
-  async getReleases(filters?: { genre?: string; year?: number; artistId?: number }): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number })[]> {
+  async getReleases(filters?: { genre?: string; year?: number; artistId?: number; includeTestData?: boolean }): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number })[]> {
     const whereConditions = [];
+    
+    // По умолчанию скрываем тестовые данные
+    if (!filters?.includeTestData) {
+      whereConditions.push(eq(releases.isTestData, false));
+    }
     
     if (filters?.artistId) {
       whereConditions.push(eq(releases.artistId, filters.artistId));
@@ -146,6 +151,7 @@ export class DatabaseStorage implements IStorage {
         releaseDate: releases.releaseDate,
         coverUrl: releases.coverUrl,
         streamingLinks: releases.streamingLinks,
+        isTestData: releases.isTestData,
         createdAt: releases.createdAt,
         artist: {
           id: artists.id,
@@ -178,6 +184,7 @@ export class DatabaseStorage implements IStorage {
         releaseDate: releases.releaseDate,
         coverUrl: releases.coverUrl,
         streamingLinks: releases.streamingLinks,
+        isTestData: releases.isTestData,
         createdAt: releases.createdAt,
         artist: {
           id: artists.id,
@@ -445,6 +452,7 @@ export class DatabaseStorage implements IStorage {
           releaseDate: releases.releaseDate,
           coverUrl: releases.coverUrl,
           streamingLinks: releases.streamingLinks,
+          isTestData: releases.isTestData,
           createdAt: releases.createdAt,
         },
         artist: {
@@ -487,6 +495,7 @@ export class DatabaseStorage implements IStorage {
           releaseDate: releases.releaseDate,
           coverUrl: releases.coverUrl,
           streamingLinks: releases.streamingLinks,
+          isTestData: releases.isTestData,
           createdAt: releases.createdAt,
         },
         artist: {

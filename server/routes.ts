@@ -98,11 +98,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Releases routes
   app.get('/api/releases', async (req, res) => {
     try {
-      const { genre, year, artistId } = req.query;
+      const { genre, year, artistId, includeTestData } = req.query;
       const filters = {
         genre: genre as string,
         year: year ? parseInt(year as string) : undefined,
         artistId: artistId ? parseInt(artistId as string) : undefined,
+        includeTestData: includeTestData === 'true',
       };
       
       const releases = await storage.getReleases(filters);
