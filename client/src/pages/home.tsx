@@ -65,10 +65,8 @@ export default function Home() {
     },
   });
 
-  const newestReleases = releases.slice(0, 12);
-  const discussedReleases = [...releases]
-    .sort((a, b) => b.commentCount - a.commentCount)
-    .slice(0, 5);
+  // All releases for filter display
+  const allReleases = releases;
 
   const handleReleaseClick = (releaseId: number) => {
     setLocation(`/release/${releaseId}`);
@@ -115,10 +113,10 @@ export default function Home() {
               </p>
               <Button 
                 className="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90"
-                onClick={() => document.getElementById('new-releases')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => document.getElementById('all-releases')?.scrollIntoView({ behavior: 'smooth' })}
                 data-testid="button-explore"
               >
-                Explore New Releases
+                Explore All Releases
               </Button>
             </div>
             <div className="absolute top-0 right-0 w-64 h-64 opacity-10">
@@ -127,18 +125,18 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Featured Collections Section */}
+        {/* Collections Section */}
         {!collectionsLoading && collections.length > 0 && (
           <section className="mb-12">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold text-foreground flex items-center">
                 <FolderOpen className="mr-3 text-primary" />
-                Featured Collections
+                Curated Collections
               </h2>
             </div>
             
             <div className="space-y-8">
-              {collections.slice(0, 3).map((collection) => (
+              {collections.map((collection) => (
                 <Card key={collection.id} className="overflow-hidden">
                   <CardContent className="p-6">
                     <div className="flex items-start justify-between mb-4">
@@ -221,147 +219,83 @@ export default function Home() {
           </section>
         )}
 
-        {/* Filter Bar */}
-        <Card className="mb-8">
-          <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="text-sm font-medium text-muted-foreground">Filter by:</span>
-              
-              <Select value={filters.genre} onValueChange={(value) => setFilters(prev => ({ ...prev, genre: value }))}>
-                <SelectTrigger className="w-40" data-testid="select-genre">
-                  <SelectValue placeholder="All Genres" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Genres</SelectItem>
-                  <SelectItem value="rock">Rock</SelectItem>
-                  <SelectItem value="pop">Pop</SelectItem>
-                  <SelectItem value="hip-hop">Hip-Hop</SelectItem>
-                  <SelectItem value="electronic">Electronic</SelectItem>
-                  <SelectItem value="jazz">Jazz</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={filters.year} onValueChange={(value) => setFilters(prev => ({ ...prev, year: value }))}>
-                <SelectTrigger className="w-32" data-testid="select-year">
-                  <SelectValue placeholder="All Years" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Years</SelectItem>
-                  <SelectItem value="2024">2024</SelectItem>
-                  <SelectItem value="2023">2023</SelectItem>
-                  <SelectItem value="2022">2022</SelectItem>
-                  <SelectItem value="2021">2021</SelectItem>
-                </SelectContent>
-              </Select>
-
-              {(filters.genre !== 'all' || filters.year !== 'all') && (
-                <Button
-                  variant="ghost"
-                  onClick={clearFilters}
-                  className="ml-auto text-sm text-primary hover:text-primary/80"
-                  data-testid="button-clear-filters"
-                >
-                  Clear Filters
-                </Button>
-              )}
+        {/* All Releases with Filters */}
+        {allReleases.length > 0 && (
+          <section className="mb-12">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-foreground flex items-center" id="all-releases">
+                <TrendingUp className="mr-3 text-primary" />
+                Browse All Releases
+              </h2>
             </div>
-          </CardContent>
-        </Card>
+            
+            {/* Filter Bar */}
+            <Card className="mb-8">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="text-sm font-medium text-muted-foreground">Filter by:</span>
+                  
+                  <Select value={filters.genre} onValueChange={(value) => setFilters(prev => ({ ...prev, genre: value }))}>
+                    <SelectTrigger className="w-40" data-testid="select-genre">
+                      <SelectValue placeholder="All Genres" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Genres</SelectItem>
+                      <SelectItem value="rock">Rock</SelectItem>
+                      <SelectItem value="pop">Pop</SelectItem>
+                      <SelectItem value="hip-hop">Hip-Hop</SelectItem>
+                      <SelectItem value="electronic">Electronic</SelectItem>
+                      <SelectItem value="jazz">Jazz</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={filters.year} onValueChange={(value) => setFilters(prev => ({ ...prev, year: value }))}>
+                    <SelectTrigger className="w-32" data-testid="select-year">
+                      <SelectValue placeholder="All Years" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      <SelectItem value="2024">2024</SelectItem>
+                      <SelectItem value="2023">2023</SelectItem>
+                      <SelectItem value="2022">2022</SelectItem>
+                      <SelectItem value="2021">2021</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-        {/* New Releases Section */}
-        <section className="mb-12" id="new-releases">
-          <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center">
-            <Clock className="mr-3 text-primary" />
-            Latest Releases
-          </h2>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-            {newestReleases.map((release) => (
-              <ReleaseCard
-                key={release.id}
-                release={release}
-                onClick={() => handleReleaseClick(release.id)}
-              />
-            ))}
-          </div>
-
-          {newestReleases.length === 0 && (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <Music className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No releases found matching your filters.</p>
+                  {(filters.genre !== 'all' || filters.year !== 'all') && (
+                    <Button
+                      variant="ghost"
+                      onClick={clearFilters}
+                      className="ml-auto text-sm text-primary hover:text-primary/80"
+                      data-testid="button-clear-filters"
+                    >
+                      Clear Filters
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
-          )}
-        </section>
+            
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+              {allReleases.map((release) => (
+                <ReleaseCard
+                  key={release.id}
+                  release={release}
+                  onClick={() => handleReleaseClick(release.id)}
+                />
+              ))}
+            </div>
 
-        {/* Section Divider */}
-        <div className="section-divider mb-12"></div>
-
-        {/* Most Discussed Section */}
-        <section className="mb-12">
-          <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center">
-            <MessageCircle className="mr-3 text-accent" />
-            Most Discussed
-          </h2>
-          
-          <div className="space-y-4">
-            {discussedReleases.map((release) => (
-              <Card 
-                key={release.id}
-                className="cursor-pointer hover:border-primary/50 transition-colors"
-                onClick={() => handleReleaseClick(release.id)}
-                data-testid={`discussed-release-${release.id}`}
-              >
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                      {release.coverUrl ? (
-                        <img 
-                          src={release.coverUrl} 
-                          alt={`${release.title} cover`}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <Music className="w-6 h-6 text-muted-foreground" />
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-foreground truncate">{release.title}</h3>
-                      <p className="text-muted-foreground text-sm truncate">{release.artist.name}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Released {new Date(release.releaseDate).toLocaleDateString()}
-                      </p>
-                    </div>
-                    
-                    <div className="flex flex-col items-end space-y-1">
-                      <div className="text-sm">
-                        <span className="font-semibold text-foreground">{Number(release.averageRating || 0).toFixed(1)}</span>
-                        <span className="text-muted-foreground">/10</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground flex items-center">
-                        <MessageCircle className="w-3 h-3 mr-1" />
-                        {release.commentCount} comments
-                      </span>
-                    </div>
-                  </div>
+            {allReleases.length === 0 && (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Music className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground">No releases found matching your filters.</p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-
-          {discussedReleases.length === 0 && (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <MessageCircle className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No discussions yet. Be the first to comment!</p>
-              </CardContent>
-            </Card>
-          )}
-        </section>
+            )}
+          </section>
+        )}
       </main>
 
       <Footer />
