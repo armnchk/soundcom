@@ -73,18 +73,14 @@ export default function Navbar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href={`/profile/${user?.id}`} className="flex items-center" data-testid="link-profile">
+                  <DropdownMenuItem onClick={() => setLocation(`/profile/${user?.id}`)} data-testid="button-profile">
                       <User className="w-4 h-4 mr-2" />
                       Профиль
-                    </Link>
                   </DropdownMenuItem>
                   {user?.isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link href="/admin" className="flex items-center" data-testid="link-admin">
+                    <DropdownMenuItem onClick={() => setLocation("/admin")} data-testid="button-admin">
                         <Shield className="w-4 h-4 mr-2" />
                         Админ панель
-                      </Link>
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem onClick={handleSignOut} data-testid="button-signout">

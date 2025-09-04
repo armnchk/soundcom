@@ -162,7 +162,7 @@ export class DatabaseStorage implements IStorage {
       .groupBy(releases.id, artists.id);
 
     if (whereConditions.length > 0) {
-      query = query.where(and(...whereConditions));
+      query = query.where(and(...whereConditions)) as any;
     }
 
     const result = await query.orderBy(desc(releases.createdAt));
@@ -411,7 +411,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(reports.reportedBy, users.id));
 
     if (status) {
-      query = query.where(eq(reports.status, status));
+      query = query.where(eq(reports.status, status)) as any;
     }
 
     const result = await query.orderBy(desc(reports.createdAt));
@@ -441,15 +441,16 @@ export class DatabaseStorage implements IStorage {
           id: releases.id,
           artistId: releases.artistId,
           title: releases.title,
+          type: releases.type,
           releaseDate: releases.releaseDate,
           coverUrl: releases.coverUrl,
           streamingLinks: releases.streamingLinks,
           createdAt: releases.createdAt,
-          artist: {
-            id: artists.id,
-            name: artists.name,
-            createdAt: artists.createdAt,
-          },
+        },
+        artist: {
+          id: artists.id,
+          name: artists.name,
+          createdAt: artists.createdAt,
         },
       })
       .from(ratings)
@@ -458,7 +459,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(ratings.userId, userId))
       .orderBy(desc(ratings.createdAt));
 
-    return result as (Rating & { release: Release & { artist: Artist } })[];
+    return result.map(row => ({
+      ...row,
+      release: {
+        ...row.release,
+        artist: row.artist
+      }
+    })) as (Rating & { release: Release & { artist: Artist } })[];
   }
 
   async getUserComments(userId: string): Promise<(Comment & { release: Release & { artist: Artist } })[]> {
@@ -476,15 +483,16 @@ export class DatabaseStorage implements IStorage {
           id: releases.id,
           artistId: releases.artistId,
           title: releases.title,
+          type: releases.type,
           releaseDate: releases.releaseDate,
           coverUrl: releases.coverUrl,
           streamingLinks: releases.streamingLinks,
           createdAt: releases.createdAt,
-          artist: {
-            id: artists.id,
-            name: artists.name,
-            createdAt: artists.createdAt,
-          },
+        },
+        artist: {
+          id: artists.id,
+          name: artists.name,
+          createdAt: artists.createdAt,
         },
       })
       .from(comments)
@@ -493,7 +501,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(comments.userId, userId))
       .orderBy(desc(comments.createdAt));
 
-    return result as (Comment & { release: Release & { artist: Artist } })[];
+    return result.map(row => ({
+      ...row,
+      release: {
+        ...row.release,
+        artist: row.artist
+      }
+    })) as (Comment & { release: Release & { artist: Artist } })[];
   }
 }
 
