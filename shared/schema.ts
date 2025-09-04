@@ -48,6 +48,7 @@ export const releases = pgTable("releases", {
   id: serial("id").primaryKey(),
   artistId: integer("artist_id").references(() => artists.id),
   title: varchar("title", { length: 255 }).notNull(),
+  type: varchar("type", { length: 50 }).default("album"), // "single" or "album"
   releaseDate: timestamp("release_date"),
   coverUrl: text("cover_url"),
   streamingLinks: jsonb("streaming_links"),

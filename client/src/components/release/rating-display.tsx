@@ -22,14 +22,14 @@ export function StarRating({
     lg: "w-5 h-5",
   };
 
-  const displayStars = Math.min(maxRating, 5); // Always show max 5 stars visually
-  const normalizedRating = maxRating > 5 ? (rating / maxRating) * 5 : rating;
-
+  // Always show 10 stars for 10-point scale
+  const displayStars = maxRating;
+  
   return (
     <div className={cn("flex items-center gap-1", className)} data-testid="star-rating">
       {Array.from({ length: displayStars }, (_, index) => {
         const starNumber = index + 1;
-        const filled = starNumber <= normalizedRating;
+        const filled = starNumber <= rating;
         
         return (
           <Star

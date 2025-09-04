@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { StarRating } from "../release/rating-display";
 import { ThumbsUp, ThumbsDown, Flag, Edit, Trash2, User } from "lucide-react";
@@ -19,7 +18,6 @@ interface CommentItemProps {
     user: {
       id: string;
       nickname: string;
-      profileImageUrl?: string;
     } | null;
     likeCount: number;
     dislikeCount: number;
@@ -37,8 +35,7 @@ export function CommentItem({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isOwner = currentUserId && comment.user?.id === currentUserId;
-  const displayName = comment.isAnonymous ? "Anonymous" : comment.user?.nickname || "Unknown";
-  const userInitials = comment.isAnonymous ? "A" : (comment.user?.nickname?.substring(0, 2).toUpperCase() || "U");
+  const displayName = comment.isAnonymous ? "Аноним" : comment.user?.nickname || "Неизвестный";
 
   const reactionMutation = useMutation({
     mutationFn: async ({ reactionType }: { reactionType: 'like' | 'dislike' }) => {
@@ -131,14 +128,9 @@ export function CommentItem({
   return (
     <div className={cn("bg-secondary rounded-lg p-4", className)} data-testid={`comment-${comment.id}`}>
       <div className="flex items-start space-x-4">
-        <Avatar className="w-10 h-10 flex-shrink-0">
-          {!comment.isAnonymous && comment.user?.profileImageUrl ? (
-            <AvatarImage src={comment.user.profileImageUrl} alt={displayName} />
-          ) : null}
-          <AvatarFallback className={comment.isAnonymous ? "bg-muted" : "bg-primary text-primary-foreground"}>
-            {comment.isAnonymous ? <User className="w-4 h-4" /> : userInitials}
-          </AvatarFallback>
-        </Avatar>
+        <div className="w-10 h-10 flex-shrink-0 bg-primary/10 rounded-full flex items-center justify-center">
+          <User className="w-5 h-5 text-primary" />
+        </div>
         
         <div className="flex-1">
           <div className="flex items-center space-x-2 mb-2">

@@ -10,7 +10,8 @@ import { CommentBlock } from "@/components/comments/comment-block";
 import { NicknameModal } from "@/components/modals/nickname-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Music, ExternalLink, ArrowLeft } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Music, ExternalLink, ArrowLeft, Star } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -145,9 +146,14 @@ export default function Release() {
               
               <div className="space-y-4">
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground mb-1" data-testid="text-release-title">
-                    {release.title}
-                  </h1>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-2xl font-bold text-foreground" data-testid="text-release-title">
+                      {release.title}
+                    </h1>
+                    <span className="px-2 py-1 text-xs font-medium bg-primary/10 text-primary rounded-full" data-testid="badge-type">
+                      {(release as any).type === 'single' ? 'Сингл' : 'Альбом'}
+                    </span>
+                  </div>
                   <button
                     onClick={() => setLocation(`/artist/${release.artist.id}`)}
                     className="text-lg text-primary hover:text-primary/80 transition-colors"
@@ -234,7 +240,50 @@ export default function Release() {
             </div>
 
             {/* Comments Section */}
-            <div className="md:col-span-2">
+            <div className="md:col-span-2 space-y-6">
+              {/* Add Comment Form */}
+              {isAuthenticated ? (
+                <Card>
+                  <CardContent className="p-6">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Оставить отзыв</h3>
+                    <div className="space-y-4">
+                      <Textarea
+                        placeholder="Поделитесь своими впечатлениями о релизе..."
+                        className="min-h-[120px]"
+                        data-testid="input-comment"
+                      />
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-sm text-muted-foreground">Оценка:</span>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
+                            <button
+                              key={star}
+                              className="p-1 hover:bg-muted rounded"
+                              data-testid={`button-comment-star-${star}`}
+                            >
+                              <Star className="w-4 h-4 text-muted-foreground hover:text-yellow-500 hover:fill-current" />
+                            </button>
+                          ))}
+                        </div>
+                        <Button data-testid="button-submit-comment">
+                          Опубликовать
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="p-6 text-center">
+                    <p className="text-muted-foreground mb-4">Войдите, чтобы оставить отзыв</p>
+                    <Button onClick={() => window.location.href = "/api/login"}>
+                      Войти
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Comments List */}
               <CommentBlock
                 releaseId={releaseId}
                 isAuthenticated={isAuthenticated}
