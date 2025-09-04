@@ -83,7 +83,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <div></div>
-            <h1 className="text-3xl font-light text-foreground tracking-wide text-glow">
+            <h1 className="text-3xl font-semibold text-foreground tracking-[0.15em] text-glow">
               RevYou
             </h1>
             <Button 
@@ -121,19 +121,19 @@ export default function Landing() {
         </div>
         
         <div className="relative text-center px-4 sm:px-6 lg:px-8 z-10">
-          <div className="hero-animation">
-            <h1 className="text-7xl md:text-9xl font-extralight text-foreground mb-8 tracking-tight text-glow">
+          <div>
+            <h1 className="text-7xl md:text-9xl font-extralight text-white mb-8 tracking-tight">
               Музыка
             </h1>
-            <h2 className="text-4xl md:text-5xl font-light text-muted-foreground/90 mb-12 tracking-wide">
+            <h2 className="text-4xl md:text-5xl font-light text-white mb-12 tracking-wide">
               в новом измерении
             </h2>
             
             <div className="max-w-4xl mx-auto">
-              <p className="text-xl md:text-2xl text-foreground/80 mb-6 leading-relaxed font-light">
+              <p className="text-xl md:text-2xl text-white mb-6 leading-relaxed font-light">
                 Откройте для себя мир музыки через призму сообщества.
               </p>
-              <p className="text-lg md:text-xl text-muted-foreground leading-relaxed font-light">
+              <p className="text-lg md:text-xl text-white leading-relaxed font-light">
                 Находите, оценивайте, обсуждайте.
               </p>
             </div>
