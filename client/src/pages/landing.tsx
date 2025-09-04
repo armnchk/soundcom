@@ -252,7 +252,7 @@ export default function Landing() {
                           <div className="flex items-center space-x-1">
                             <Star className="w-3 h-3 text-yellow-500 fill-current" />
                             <span className="text-xs font-medium text-foreground">
-                              {release.averageRating.toFixed(1)}
+                              {Number(release.averageRating || 0).toFixed(1)}
                             </span>
                           </div>
                           <div className="flex items-center space-x-1">
@@ -347,7 +347,7 @@ export default function Landing() {
                           </div>
                         </div>
                         <div className="absolute top-4 right-4 bg-primary/90 text-primary-foreground px-3 py-1.5 rounded-full text-sm font-medium neon-glow">
-                          {release.averageRating.toFixed(1)}
+                          {Number(release.averageRating || 0).toFixed(1)}
                         </div>
                       </div>
                       
@@ -364,7 +364,7 @@ export default function Landing() {
                             {[...Array(5)].map((_, i) => (
                               <Star 
                                 key={i} 
-                                className={`w-3 h-3 ${i < Math.round(release.averageRating / 2) ? 'text-yellow-500 fill-current' : 'text-muted-foreground'}`} 
+                                className={`w-3 h-3 ${i < Math.round(Number(release.averageRating || 0) / 2) ? 'text-yellow-500 fill-current' : 'text-muted-foreground'}`} 
                               />
                             ))}
                           </div>
