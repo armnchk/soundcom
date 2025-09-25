@@ -25,9 +25,6 @@ export default function Release() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [showNicknameModal, setShowNicknameModal] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [commentRating, setCommentRating] = useState(0);
-
   const releaseId = parseInt(id || '0');
 
   const { data: release, isLoading } = useQuery<Release & { artist: Artist; averageRating: number; commentCount: number }>({
@@ -40,53 +37,6 @@ export default function Release() {
       setShowNicknameModal(true);
     }
   }, [isAuthenticated, authLoading, user]);
-
-
-  const commentMutation = useMutation({
-    mutationFn: async (data: { text: string; rating?: number }) => {
-      await apiRequest('POST', `/api/releases/${releaseId}/comments`, data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/releases/${releaseId}/comments`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/releases/${releaseId}`] });
-      setCommentText("");
-      setCommentRating(0);
-      toast({ title: "Отзыв опубликован!" });
-    },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Не авторизован",
-          description: "Вы не авторизованы. Выполняется вход...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Ошибка",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleCommentSubmit = () => {
-    if (!commentText.trim()) {
-      toast({
-        title: "Ошибка",
-        description: "Введите текст комментария",
-        variant: "destructive",
-      });
-      return;
-    }
-    commentMutation.mutate({
-      text: commentText,
-      rating: commentRating || undefined,
-    });
-  };
 
 
   if (authLoading || isLoading) {

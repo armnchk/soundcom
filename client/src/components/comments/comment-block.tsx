@@ -3,7 +3,10 @@ import { CommentItem } from "./comment-item";
 import { CommentForm } from "./comment-form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { Edit, Star } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CommentBlockProps {
   releaseId: number;
@@ -13,6 +16,8 @@ interface CommentBlockProps {
 
 export function CommentBlock({ releaseId, isAuthenticated, currentUserId }: CommentBlockProps) {
   const [sortBy, setSortBy] = useState<'date' | 'rating' | 'likes'>('date');
+  const [isEditing, setIsEditing] = useState(false);
+  const { user } = useAuth();
 
   const { data: comments = [], isLoading } = useQuery({
     queryKey: ["/api/releases", releaseId, "comments", { sortBy }],
@@ -23,6 +28,11 @@ export function CommentBlock({ releaseId, isAuthenticated, currentUserId }: Comm
       return response.json();
     },
   });
+
+  // Find current user's comment with rating
+  const userComment = comments.find((comment: any) => 
+    comment.userId === user?.id && comment.rating !== null
+  );
 
   if (isLoading) {
     return (
@@ -55,12 +65,80 @@ export function CommentBlock({ releaseId, isAuthenticated, currentUserId }: Comm
         </Select>
       </div>
 
-      {/* Rate This Release Form */}
+      {/* Rating Section */}
       {isAuthenticated && (
         <Card>
           <CardContent className="p-6">
-            <h3 className="text-lg font-semibold text-foreground mb-4">Оценить релиз</h3>
-            <CommentForm releaseId={releaseId} />
+            {userComment && !isEditing ? (
+              // Show existing rating
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-foreground">Ваша оценка</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditing(true)}
+                    data-testid="button-edit-rating"
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Редактировать
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: userComment.rating }, (_, i) => (
+                        <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                      ))}
+                      {Array.from({ length: 10 - userComment.rating }, (_, i) => (
+                        <Star key={i} className="w-5 h-5 text-muted-foreground" />
+                      ))}
+                    </div>
+                    <span className="text-xl font-bold text-primary">{userComment.rating}/10</span>
+                    {userComment.updatedAt !== userComment.createdAt && (
+                      <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                        отредактировано
+                      </span>
+                    )}
+                  </div>
+                  {userComment.text && (
+                    <div className="p-3 bg-muted rounded-lg">
+                      <p className="text-sm">{userComment.text}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Show rating form
+              <div>
+                <h3 className="text-lg font-semibold text-foreground mb-4">
+                  {userComment ? "Редактировать оценку" : "Оценить релиз"}
+                </h3>
+                <CommentForm 
+                  releaseId={releaseId}
+                  initialData={userComment ? {
+                    id: userComment.id,
+                    text: userComment.text,
+                    rating: userComment.rating,
+                    isAnonymous: userComment.isAnonymous
+                  } : undefined}
+                  mode={userComment ? 'edit' : 'create'}
+                  onSuccess={() => {
+                    setIsEditing(false);
+                  }}
+                />
+                {isEditing && (
+                  <Button
+                    variant="outline"
+                    className="mt-3"
+                    onClick={() => setIsEditing(false)}
+                    data-testid="button-cancel-edit"
+                  >
+                    Отмена
+                  </Button>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

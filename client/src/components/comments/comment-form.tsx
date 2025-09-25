@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 interface CommentFormProps {
   releaseId: number;
   initialData?: {
+    id?: number;
     text?: string;
     rating?: number;
     isAnonymous?: boolean;
@@ -57,7 +58,11 @@ export function CommentForm({
 
   const commentMutation = useMutation({
     mutationFn: async (data: { text?: string; rating?: number; isAnonymous: boolean }) => {
-      await apiRequest('POST', `/api/releases/${releaseId}/comments`, data);
+      if (mode === 'edit' && initialData?.id) {
+        await apiRequest('PUT', `/api/comments/${initialData.id}`, data);
+      } else {
+        await apiRequest('POST', `/api/releases/${releaseId}/comments`, data);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId, "comments"] });
