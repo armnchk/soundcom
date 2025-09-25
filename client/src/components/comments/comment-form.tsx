@@ -47,13 +47,13 @@ export function CommentForm({
       }
       
       onSuccess?.();
-      toast({ title: "Comment submitted successfully!" });
+      toast({ title: "Комментарий отправлен!" });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          title: "Не авторизован",
+          description: "Вы не авторизованы. Выполняется вход...",
           variant: "destructive",
         });
         setTimeout(() => {
@@ -62,7 +62,7 @@ export function CommentForm({
         return;
       }
       toast({ 
-        title: "Failed to submit comment", 
+        title: "Ошибка при отправке комментария", 
         description: error.message,
         variant: "destructive" 
       });
@@ -74,7 +74,7 @@ export function CommentForm({
     
     if (!text.trim() && rating === 0) {
       toast({
-        title: "Please add a rating or comment",
+        title: "Добавьте оценку или комментарий",
         variant: "destructive"
       });
       return;
@@ -98,11 +98,11 @@ export function CommentForm({
 
       <div>
         <Label htmlFor="comment-text" className="text-sm font-medium text-foreground mb-2 block">
-          Add a Review (Optional)
+          Добавить отзыв (необязательно)
         </Label>
         <Textarea
           id="comment-text"
-          placeholder="Share your thoughts about this release..."
+          placeholder="Поделитесь своими мыслями об этом релизе..."
           value={text}
           onChange={(e) => setText(e.target.value)}
           className="resize-none min-h-20"
@@ -118,7 +118,7 @@ export function CommentForm({
               data-testid="checkbox-anonymous"
             />
             <Label htmlFor="anonymous" className="text-sm text-muted-foreground">
-              Post anonymously
+              Опубликовать анонимно
             </Label>
           </div>
           <span className="text-xs text-muted-foreground" data-testid="text-char-count">
@@ -133,7 +133,7 @@ export function CommentForm({
         className="bg-primary text-primary-foreground hover:bg-primary/90"
         data-testid="button-submit"
       >
-        {commentMutation.isPending ? "Submitting..." : mode === 'edit' ? "Update" : "Submit Rating"}
+        {commentMutation.isPending ? "Отправляем..." : mode === 'edit' ? "Обновить" : "Отправить"}
       </Button>
     </form>
   );

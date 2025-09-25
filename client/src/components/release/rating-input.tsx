@@ -16,40 +16,37 @@ export function RatingInput({
   onRatingChange,
   maxRating = 10,
   size = "lg",
-  label = "Your Rating",
+  label = "Ваша оценка",
   className,
 }: RatingInputProps) {
-  const sizeClasses = {
-    sm: "w-4 h-4",
-    md: "w-5 h-5",
-    lg: "w-6 h-6",
-  };
-
   return (
     <div className={cn("space-y-2", className)}>
       {label && (
         <Label className="text-sm font-medium text-foreground">{label}</Label>
       )}
-      <div className="flex items-center gap-1" data-testid="rating-input">
+      <div className="flex items-center gap-2" data-testid="rating-input">
         {Array.from({ length: maxRating }, (_, index) => {
-          const starNumber = index + 1;
-          const filled = starNumber <= rating;
+          const ratingNumber = index + 1;
+          const isSelected = ratingNumber === rating;
           
           return (
-            <Star
+            <button
               key={index}
               className={cn(
-                sizeClasses[size],
-                "cursor-pointer transition-colors",
-                filled ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground hover:text-yellow-400"
+                "w-8 h-8 rounded-md text-sm font-medium transition-colors border",
+                isSelected 
+                  ? "bg-primary text-primary-foreground border-primary" 
+                  : "bg-background text-foreground border-border hover:bg-secondary hover:border-secondary-foreground/20"
               )}
-              onClick={() => onRatingChange(starNumber)}
-              data-testid={`star-input-${starNumber}`}
-            />
+              onClick={() => onRatingChange(ratingNumber)}
+              data-testid={`rating-input-${ratingNumber}`}
+            >
+              {ratingNumber}
+            </button>
           );
         })}
         <span className="text-sm text-muted-foreground ml-2" data-testid="rating-value">
-          {rating > 0 ? `${rating}/10` : "Rate this release"}
+          {rating > 0 ? `${rating}/10` : "Оценить релиз"}
         </span>
       </div>
     </div>
