@@ -131,49 +131,53 @@ export default function Release() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Release Header Info */}
         <Card className="p-6 md:p-8 mb-8">
-          <div className="space-y-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <h1 className="text-3xl md:text-4xl font-bold text-foreground" data-testid="text-release-title">
-                  {release.title}
-                </h1>
-                <span className="px-3 py-1 text-sm font-medium bg-primary/10 text-primary rounded-full" data-testid="badge-type">
-                  {(release as any).type === 'single' ? 'Сингл' : 'Альбом'}
-                </span>
-              </div>
-              <button
-                onClick={() => setLocation(`/artist/${release.artist.id}`)}
-                className="text-xl text-primary hover:text-primary/80 transition-colors block mb-1"
-                data-testid="link-artist"
-              >
-                {release.artist.name}
-              </button>
-              <p className="text-muted-foreground">
-                Выпущен {release.releaseDate ? new Date(release.releaseDate).toLocaleDateString('ru-RU') : 'Неизвестно'}
-              </p>
-            </div>
-            
-            {/* Average Rating Display */}
-            <div className="flex items-center gap-8">
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-1">Рейтинг сообщества</h3>
-                <div className="flex items-center space-x-3">
-                  <span className="text-4xl font-bold text-primary" data-testid="text-average-rating">
-                    {release.averageRating && Number(release.averageRating) > 0 ? Number(release.averageRating).toFixed(1) : '—'}
-                  </span>
-                  <div>
-                    <p className="text-sm text-muted-foreground">
-                      {release.commentCount > 0 ? `На основе ${release.commentCount} оценок` : 'Пока нет оценок'}
-                    </p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+            {/* Cover */}
+            <div className="md:col-span-1">
+              <div className="aspect-square overflow-hidden rounded-xl max-w-[200px] mx-auto md:mx-0">
+                {release.coverUrl ? (
+                  <img 
+                    src={release.coverUrl} 
+                    alt={`${release.title} cover`}
+                    className="w-full h-full object-cover shadow-lg"
+                    data-testid="img-release-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center rounded-xl">
+                    <Music className="w-16 h-16 text-muted-foreground" />
                   </div>
+                )}
+              </div>
+            </div>
+
+            {/* Release Info */}
+            <div className="md:col-span-2 space-y-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <h1 className="text-3xl md:text-4xl font-bold text-foreground" data-testid="text-release-title">
+                    {release.title}
+                  </h1>
+                  <span className="px-3 py-1 text-sm font-medium bg-primary/10 text-primary rounded-full" data-testid="badge-type">
+                    {(release as any).type === 'single' ? 'Сингл' : 'Альбом'}
+                  </span>
                 </div>
+                <button
+                  onClick={() => setLocation(`/artist/${release.artist.id}`)}
+                  className="text-xl text-primary hover:text-primary/80 transition-colors block mb-1"
+                  data-testid="link-artist"
+                >
+                  {release.artist.name}
+                </button>
+                <p className="text-muted-foreground">
+                  Выпущен {release.releaseDate ? new Date(release.releaseDate).toLocaleDateString('ru-RU') : 'Неизвестно'}
+                </p>
               </div>
 
               {/* Streaming Links */}
               {(streamingLinks.spotify || streamingLinks.appleMusic) && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-foreground">Слушать на</h3>
-                  <div className="flex space-x-2">
+                  <div className="flex flex-wrap gap-2">
                     {streamingLinks.spotify && (
                       <Button
                         variant="secondary"
@@ -204,40 +208,31 @@ export default function Release() {
                 </div>
               )}
             </div>
+
+            {/* Rating */}
+            <div className="md:col-span-1">
+              <div className="text-center md:text-left">
+                <h3 className="text-sm font-semibold text-foreground mb-2">Рейтинг сообщества</h3>
+                <div className="space-y-1">
+                  <span className="text-4xl font-bold text-primary block" data-testid="text-average-rating">
+                    {release.averageRating && Number(release.averageRating) > 0 ? Number(release.averageRating).toFixed(1) : '—'}
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    {release.commentCount > 0 ? `На основе ${release.commentCount} оценок` : 'Пока нет оценок'}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </Card>
 
-        {/* Content Grid */}
+        {/* Comments Section */}
         <Card className="p-6 md:p-8">
-          <div className="grid md:grid-cols-3 gap-8">
-            {/* Cover */}
-            <div className="md:col-span-1">
-              <div className="aspect-square overflow-hidden rounded-xl">
-                {release.coverUrl ? (
-                  <img 
-                    src={release.coverUrl} 
-                    alt={`${release.title} cover`}
-                    className="w-full h-full object-cover shadow-lg"
-                    data-testid="img-release-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center rounded-xl">
-                    <Music className="w-24 h-24 text-muted-foreground" />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Comments Section */}
-            <div className="md:col-span-2 space-y-6">
-              {/* Comments List */}
-              <CommentBlock
-                releaseId={releaseId}
-                isAuthenticated={isAuthenticated}
-                currentUserId={user?.id}
-              />
-            </div>
-          </div>
+          <CommentBlock
+            releaseId={releaseId}
+            isAuthenticated={isAuthenticated}
+            currentUserId={user?.id}
+          />
         </Card>
       </main>
 
