@@ -60,13 +60,13 @@ export default function Release() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/releases/${releaseId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/releases/${releaseId}/user-rating`] });
-      toast({ title: "Rating submitted successfully!" });
+      toast({ title: "Оценка сохранена!" });
     },
     onError: (error) => {
       if (isUnauthorizedError(error)) {
         toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
+          title: "Не авторизован",
+          description: "Вы не авторизованы. Выполняется вход...",
           variant: "destructive",
         });
         setTimeout(() => {
@@ -75,7 +75,7 @@ export default function Release() {
         return;
       }
       toast({ 
-        title: "Failed to submit rating", 
+        title: "Ошибка при сохранении оценки", 
         description: error.message,
         variant: "destructive" 
       });
@@ -138,7 +138,7 @@ export default function Release() {
       <div className="min-h-screen bg-background">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground">Loading release...</div>
+          <div className="animate-pulse text-muted-foreground">Загружаем релиз...</div>
         </div>
         <Footer />
       </div>
@@ -152,11 +152,11 @@ export default function Release() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
           <Card>
             <CardContent className="p-12 text-center">
-              <h1 className="text-2xl font-bold text-foreground mb-2">Release Not Found</h1>
-              <p className="text-muted-foreground mb-4">The release you're looking for doesn't exist.</p>
+              <h1 className="text-2xl font-bold text-foreground mb-2">Релиз не найден</h1>
+              <p className="text-muted-foreground mb-4">Релиз, который вы ищете, не существует.</p>
               <Button onClick={() => setLocation("/")} data-testid="button-go-home">
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Go Home
+                На главную
               </Button>
             </CardContent>
           </Card>
@@ -210,7 +210,7 @@ export default function Release() {
                     {release.artist.name}
                   </button>
                   <p className="text-sm text-muted-foreground">
-                    Released {release.releaseDate ? new Date(release.releaseDate).toLocaleDateString() : 'Unknown'}
+                    Выпущен {release.releaseDate ? new Date(release.releaseDate).toLocaleDateString('ru-RU') : 'Неизвестно'}
                   </p>
                 </div>
                 
@@ -220,35 +220,16 @@ export default function Release() {
                     <h3 className="text-sm font-semibold text-foreground mb-2">Рейтинг сообщества</h3>
                     <div className="flex items-center space-x-3">
                       <span className="text-3xl font-bold text-primary" data-testid="text-average-rating">
-                        {Number(release.averageRating || 0).toFixed(1)}
+                        {release.averageRating && Number(release.averageRating) > 0 ? Number(release.averageRating).toFixed(1) : '—'}
                       </span>
                       <div>
-                        <StarRating rating={Number(release.averageRating || 0)} maxRating={10} size="sm" />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          На основе оценок сообщества
+                        <p className="text-xs text-muted-foreground">
+                          {release.commentCount > 0 ? `На основе ${release.commentCount} оценок` : 'Пока нет оценок'}
                         </p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-
-                {/* User's Rating */}
-                {isAuthenticated && (
-                  <Card>
-                    <CardContent className="p-4">
-                      <RatingInput
-                        rating={userRating}
-                        onRatingChange={handleRatingSubmit}
-                        maxRating={10}
-                        size="md"
-                        label="Ваша оценка"
-                      />
-                      {ratingMutation.isPending && (
-                        <p className="text-xs text-muted-foreground mt-2">Сохраняем оценку...</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
 
                 {/* Streaming Links */}
                 {(streamingLinks.spotify || streamingLinks.appleMusic) && (
@@ -293,8 +274,45 @@ export default function Release() {
               {isAuthenticated ? (
                 <Card>
                   <CardContent className="p-6">
-                    <h3 className="text-lg font-semibold text-foreground mb-4">Оставить отзыв</h3>
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Оставить отзыв и оценку</h3>
                     <div className="space-y-4">
+                      {/* Rating Input */}
+                      <div className="space-y-2">
+                        <span className="text-sm font-medium text-foreground">Ваша оценка:</span>
+                        <div className="flex items-center space-x-2">
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
+                            <button
+                              key={rating}
+                              className={`w-8 h-8 rounded-md text-sm font-medium transition-colors ${
+                                rating === userRating
+                                  ? 'bg-primary text-primary-foreground'
+                                  : rating === commentRating
+                                  ? 'bg-secondary text-secondary-foreground'
+                                  : 'bg-muted text-muted-foreground hover:bg-secondary hover:text-secondary-foreground'
+                              }`}
+                              data-testid={`button-rating-${rating}`}
+                              onClick={() => {
+                                if (userRating === 0) {
+                                  // Если пользователь еще не оценивал, сразу сохраняем его оценку
+                                  handleRatingSubmit(rating);
+                                }
+                                setCommentRating(rating);
+                              }}
+                            >
+                              {rating}
+                            </button>
+                          ))}
+                          {userRating > 0 && (
+                            <span className="text-sm text-muted-foreground ml-2">
+                              (Ваша оценка: {userRating})
+                            </span>
+                          )}
+                        </div>
+                        {ratingMutation.isPending && (
+                          <p className="text-xs text-muted-foreground">Сохраняем оценку...</p>
+                        )}
+                      </div>
+                      
                       <Textarea
                         placeholder="Поделитесь своими впечатлениями о релизе..."
                         className="min-h-[120px]"
@@ -302,30 +320,13 @@ export default function Release() {
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
                       />
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm text-muted-foreground">Оценка:</span>
-                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
-                            <button
-                              key={star}
-                              className="p-1 hover:bg-muted rounded"
-                              data-testid={`button-comment-star-${star}`}
-                              onClick={() => setCommentRating(star)}
-                            >
-                              <Star className={`w-4 h-4 ${
-                                star <= commentRating
-                                  ? 'text-yellow-500 fill-current'
-                                  : 'text-muted-foreground hover:text-yellow-500 hover:fill-current'
-                              }`} />
-                            </button>
-                          ))}
-                        </div>
+                      <div className="flex justify-end">
                         <Button 
                           data-testid="button-submit-comment"
                           onClick={handleCommentSubmit}
                           disabled={commentMutation.isPending || !commentText.trim()}
                         >
-                          {commentMutation.isPending ? "Отправляем..." : "Опубликовать"}
+                          {commentMutation.isPending ? "Отправляем..." : "Опубликовать отзыв"}
                         </Button>
                       </div>
                     </div>
@@ -334,7 +335,7 @@ export default function Release() {
               ) : (
                 <Card>
                   <CardContent className="p-6 text-center">
-                    <p className="text-muted-foreground mb-4">Войдите, чтобы оставить отзыв</p>
+                    <p className="text-muted-foreground mb-4">Войдите, чтобы оставить отзыв и оценку</p>
                     <Button onClick={() => window.location.href = "/api/login"}>
                       Войти
                     </Button>
