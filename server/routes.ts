@@ -271,6 +271,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Rating must be between 1 and 10" });
       }
 
+      // Check if user already has a comment with rating for this release
+      if (rating && !isAnonymous) {
+        const existingComment = await storage.getUserCommentForRelease(userId, releaseId);
+        if (existingComment && existingComment.rating) {
+          return res.status(400).json({ message: "You have already rated this release" });
+        }
+      }
+
       const commentData = {
         userId: isAnonymous ? null : userId,
         releaseId,

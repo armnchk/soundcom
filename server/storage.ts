@@ -380,6 +380,15 @@ export class DatabaseStorage implements IStorage {
     await db.delete(comments).where(eq(comments.id, id));
   }
 
+  async getUserCommentForRelease(userId: string, releaseId: number): Promise<Comment | null> {
+    const [result] = await db
+      .select()
+      .from(comments)
+      .where(and(eq(comments.userId, userId), eq(comments.releaseId, releaseId)))
+      .limit(1);
+    return result || null;
+  }
+
   // Comment reaction operations
   async upsertCommentReaction(reaction: InsertCommentReaction): Promise<CommentReaction> {
     const [result] = await db

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -8,6 +8,7 @@ import { RatingInput } from "../release/rating-input";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
+import { useAuth } from "@/hooks/useAuth";
 
 interface CommentFormProps {
   releaseId: number;
@@ -31,6 +32,28 @@ export function CommentForm({
   const [isAnonymous, setIsAnonymous] = useState(initialData?.isAnonymous || false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // Check if user already has a comment for this release
+  const { data: existingComments = [] } = useQuery({
+    queryKey: ["/api/releases", releaseId, "comments"],
+    queryFn: async () => {
+      const response = await fetch(`/api/releases/${releaseId}/comments`);
+      if (!response.ok) throw new Error('Failed to fetch comments');
+      return response.json();
+    },
+    enabled: !!user,
+  });
+
+  const existingUserComment = existingComments.find((comment: any) => 
+    comment.userId === user?.id && comment.rating !== null
+  );
+
+  useEffect(() => {
+    if (existingUserComment && mode === 'create') {
+      setRating(existingUserComment.rating || 0);
+    }
+  }, [existingUserComment, mode]);
 
   const commentMutation = useMutation({
     mutationFn: async (data: { text?: string; rating?: number; isAnonymous: boolean }) => {
@@ -61,11 +84,19 @@ export function CommentForm({
         }, 500);
         return;
       }
-      toast({ 
-        title: "Ошибка при отправке комментария", 
-        description: error.message,
-        variant: "destructive" 
-      });
+      if (error.message.includes("already rated")) {
+        toast({ 
+          title: "Вы уже оценили этот релиз", 
+          description: "Каждый пользователь может поставить только одну оценку",
+          variant: "destructive" 
+        });
+      } else {
+        toast({ 
+          title: "Ошибка при отправке комментария", 
+          description: error.message,
+          variant: "destructive" 
+        });
+      }
     },
   });
 
@@ -89,11 +120,26 @@ export function CommentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {existingUserComment && (
+        <div className="p-3 bg-muted rounded-lg">
+          <p className="text-sm text-muted-foreground">
+            Ваша текущая оценка: <strong>{existingUserComment.rating}/10</strong>
+            {existingUserComment.text && (
+              <>
+                <br />
+                Ваш отзыв: "{existingUserComment.text}"
+              </>
+            )}
+          </p>
+        </div>
+      )}
+      
       <RatingInput
         rating={rating}
         onRatingChange={setRating}
         maxRating={10}
         size="lg"
+        label={existingUserComment ? "Изменить оценку" : "Ваша оценка"}
       />
 
       <div>
