@@ -1,5 +1,5 @@
-import { parseYandexPlaylist, extractUniqueArtists } from './yandex-music-parser';
-import { searchSpotifyArtist, getArtistDiscography } from './spotify-client';
+import { parsePlaylist, parseMultiplePlaylists } from './russian-music-parsers';
+import { musicAPI } from './combined-music-api';
 import { db } from './db';
 import { artists, releases } from '../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
@@ -47,27 +47,37 @@ async function findOrCreateArtist(artistName: string, yandexMusicUrl?: string, y
   return newArtist[0].id;
 }
 
-// Update artist with Spotify information
-async function updateArtistWithSpotifyInfo(artistId: number, spotifyInfo: any) {
+// Update artist with external music service information
+async function updateArtistWithMusicInfo(artistId: number, artistInfo: any, source: 'deezer' | 'itunes') {
+  const updateData: any = {
+    lastUpdated: new Date()
+  };
+  
+  if (source === 'deezer') {
+    updateData.deezerId = artistInfo.id;
+    updateData.genres = artistInfo.genres;
+    updateData.popularity = artistInfo.popularity;
+    updateData.imageUrl = artistInfo.imageUrl;
+  } else if (source === 'itunes') {
+    updateData.itunesId = artistInfo.id;
+    updateData.genres = artistInfo.genres;
+  }
+  
   await db.update(artists)
-    .set({
-      spotifyId: spotifyInfo.id,
-      genres: spotifyInfo.genres,
-      popularity: spotifyInfo.popularity,
-      followers: spotifyInfo.followers,
-      lastUpdated: new Date()
-    })
+    .set(updateData)
     .where(eq(artists.id, artistId));
 }
 
 // Check if release already exists
-async function releaseExists(spotifyId: string, artistId: number, title: string): Promise<boolean> {
+async function releaseExists(externalId: string, artistId: number, title: string, source: 'deezer' | 'itunes'): Promise<boolean> {
   const existing = await db.select()
     .from(releases)
     .where(
       and(
         eq(releases.artistId, artistId),
-        spotifyId ? eq(releases.spotifyId, spotifyId) : eq(releases.title, title)
+        externalId ? 
+          (source === 'deezer' ? eq(releases.deezerId, externalId) : eq(releases.itunesId, externalId))
+          : eq(releases.title, title)
       )
     )
     .limit(1);
@@ -75,75 +85,87 @@ async function releaseExists(spotifyId: string, artistId: number, title: string)
   return existing.length > 0;
 }
 
-// Create release from Spotify album
-async function createReleaseFromSpotifyAlbum(album: any, artistId: number) {
-  const coverUrl = album.images && album.images.length > 0 ? album.images[0].url : null;
-  
-  await db.insert(releases).values({
+// Create release from external album data
+async function createReleaseFromAlbum(album: any, artistId: number, source: 'deezer' | 'itunes') {
+  const releaseData: any = {
     artistId,
-    title: album.name,
-    type: album.album_type, // 'album', 'single', or 'compilation'
-    releaseDate: new Date(album.release_date),
-    coverUrl,
-    spotifyId: album.id,
-    totalTracks: album.total_tracks,
-    streamingLinks: {
-      spotify: `https://open.spotify.com/album/${album.id}`
-    }
-  });
+    title: album.title,
+    type: album.albumType,
+    coverUrl: album.imageUrl,
+    totalTracks: album.trackCount
+  };
+  
+  if (album.releaseDate) {
+    releaseData.releaseDate = new Date(album.releaseDate);
+  }
+  
+  if (source === 'deezer') {
+    releaseData.deezerId = album.id;
+    releaseData.streamingLinks = {
+      deezer: `https://www.deezer.com/album/${album.id}`
+    };
+  } else if (source === 'itunes') {
+    releaseData.itunesId = album.id;
+    releaseData.streamingLinks = {
+      itunes: `https://music.apple.com/album/${album.id}`
+    };
+  }
+  
+  await db.insert(releases).values(releaseData);
 }
 
-// Process a single artist: find in Spotify and import discography
-async function processArtist(artistName: string, yandexMusicUrl?: string, yandexMusicId?: string): Promise<{
+// Process a single artist: find in combined music APIs and import discography
+async function processArtist(artistName: string): Promise<{
   newReleases: number;
   skippedReleases: number;
   error?: string;
 }> {
   try {
-    console.log(`Processing artist: ${artistName}`);
+    console.log(`🎵 Processing artist: ${artistName}`);
     
-    // Find or create artist in our database
-    const artistId = await findOrCreateArtist(artistName, yandexMusicUrl, yandexMusicId);
+    // Search for artist using combined API (Deezer + iTunes fallback)
+    const musicResult = await musicAPI.findArtist(artistName);
     
-    // Search for artist in Spotify
-    const spotifyArtist = await searchSpotifyArtist(artistName);
-    
-    if (!spotifyArtist) {
-      console.log(`Artist "${artistName}" not found in Spotify`);
-      return { newReleases: 0, skippedReleases: 0, error: `Not found in Spotify` };
+    if (!musicResult) {
+      console.log(`❌ Artist "${artistName}" not found in any music service`);
+      return { newReleases: 0, skippedReleases: 0, error: `Not found in music services` };
     }
     
-    console.log(`Found Spotify artist: ${spotifyArtist.name} (ID: ${spotifyArtist.id})`);
+    const { artist, albums } = musicResult;
     
-    // Update artist with Spotify information
-    await updateArtistWithSpotifyInfo(artistId, spotifyArtist);
+    console.log(`✅ Found artist: ${artist.name} (${artist.source}, ID: ${artist.id})`);
     
-    // Get artist's discography from Spotify
-    const discography = await getArtistDiscography(spotifyArtist.id);
+    // Find or create artist in our database
+    const artistId = await findOrCreateArtist(artist.name, artist.source, artist.id);
     
-    console.log(`Found ${discography.length} releases for ${artistName}`);
+    // Update artist with external music service information
+    await updateArtistWithMusicInfo(artistId, artist, artist.source);
+    
+    console.log(`📀 Found ${albums.length} releases for ${artist.name}`);
     
     let newReleases = 0;
     let skippedReleases = 0;
     
-    for (const album of discography) {
+    for (const album of albums) {
       // Check if release already exists
-      if (await releaseExists(album.id, artistId, album.name)) {
+      if (await releaseExists(album.id, artistId, album.title, album.source)) {
         skippedReleases++;
         continue;
       }
       
       // Create new release
-      await createReleaseFromSpotifyAlbum(album, artistId);
+      await createReleaseFromAlbum(album, artistId, album.source);
       newReleases++;
       
-      console.log(`Added release: "${album.name}" (${album.album_type})`);
+      console.log(`  ✅ Added release: "${album.title}" (${album.albumType})`);
     }
+    
+    console.log(`📊 ${artist.name}: +${newReleases} новых, ~${skippedReleases} пропущено`);
     
     return { newReleases, skippedReleases };
     
   } catch (error) {
-    console.error(`Error processing artist "${artistName}":`, error);
+    console.error(`❌ Error processing artist "${artistName}":`, error);
     return { 
       newReleases: 0, 
       skippedReleases: 0, 
@@ -152,8 +174,8 @@ async function processArtist(artistName: string, yandexMusicUrl?: string, yandex
   }
 }
 
-// Import music from a single Yandex playlist
-export async function importFromYandexPlaylist(playlistUrl: string): Promise<ImportStats> {
+// Import music from a single Russian music playlist (MTS Music, etc.)
+export async function importFromRussianPlaylist(playlistUrl: string): Promise<ImportStats> {
   const stats: ImportStats = {
     newArtists: 0,
     updatedArtists: 0,
@@ -163,36 +185,28 @@ export async function importFromYandexPlaylist(playlistUrl: string): Promise<Imp
   };
   
   try {
-    console.log(`Starting import from playlist: ${playlistUrl}`);
+    console.log(`🎵 Starting import from playlist: ${playlistUrl}`);
     
-    // Parse Yandex Music playlist
-    const playlist = await parseYandexPlaylist(playlistUrl);
+    // Parse Russian music playlist (MTS Music, etc.)
+    const playlistResult = await parsePlaylist(playlistUrl);
     
-    if (!playlist) {
+    if (!playlistResult) {
       stats.errors.push(`Failed to parse playlist: ${playlistUrl}`);
       return stats;
     }
     
-    console.log(`Parsed playlist "${playlist.title}" with ${playlist.tracks.length} tracks`);
+    console.log(`📋 Parsed playlist "${playlistResult.name}" with ${playlistResult.tracks.length} tracks`);
+    console.log(`👨‍🎤 Found ${playlistResult.uniqueArtists.length} unique artists`);
     
-    // Extract unique artists
-    const uniqueArtists = extractUniqueArtists([playlist]);
-    
-    console.log(`Found ${uniqueArtists.length} unique artists`);
-    
-    // Process each artist
-    for (const artistInfo of uniqueArtists) {
-      const result = await processArtist(
-        artistInfo.artist, 
-        artistInfo.artistUrl, 
-        artistInfo.artistId
-      );
+    // Process each unique artist
+    for (const artistName of playlistResult.uniqueArtists) {
+      const result = await processArtist(artistName);
       
       stats.newReleases += result.newReleases;
       stats.skippedReleases += result.skippedReleases;
       
       if (result.error) {
-        stats.errors.push(`${artistInfo.artist}: ${result.error}`);
+        stats.errors.push(`${artistName}: ${result.error}`);
       } else {
         if (result.newReleases > 0) {
           stats.newArtists++;
@@ -200,21 +214,27 @@ export async function importFromYandexPlaylist(playlistUrl: string): Promise<Imp
       }
       
       // Rate limiting between artists
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
-    console.log(`Import completed. New releases: ${stats.newReleases}, Skipped: ${stats.skippedReleases}, Errors: ${stats.errors.length}`);
+    console.log(`✅ Import completed. New releases: ${stats.newReleases}, Skipped: ${stats.skippedReleases}, Errors: ${stats.errors.length}`);
     
     return stats;
     
   } catch (error) {
-    console.error('Error during playlist import:', error);
+    console.error('❌ Error during playlist import:', error);
     stats.errors.push(`Import failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return stats;
   }
 }
 
-// Update all existing artists with new releases
+// Обратная совместимость
+export async function importFromYandexPlaylist(playlistUrl: string): Promise<ImportStats> {
+  console.log(`⚠️ importFromYandexPlaylist is deprecated, use importFromRussianPlaylist instead`);
+  return importFromRussianPlaylist(playlistUrl);
+}
+
+// Update all existing artists with new releases using combined API
 export async function updateAllArtists(): Promise<ImportStats> {
   const stats: ImportStats = {
     newArtists: 0,
@@ -227,36 +247,43 @@ export async function updateAllArtists(): Promise<ImportStats> {
   try {
     console.log('🔄 Starting update of all existing artists...');
 
-    // Get all artists with Spotify IDs
-    const artistsWithSpotify = await db
+    // Get all artists with external music service IDs
+    const artistsWithExternalIds = await db
       .select()
       .from(artists)
-      .where(sql`spotify_id IS NOT NULL AND spotify_id != ''`);
+      .where(sql`(deezer_id IS NOT NULL AND deezer_id != '') OR (itunes_id IS NOT NULL AND itunes_id != '')`);
 
-    console.log(`Found ${artistsWithSpotify.length} artists with Spotify IDs`);
+    console.log(`Found ${artistsWithExternalIds.length} artists with external music service IDs`);
 
-    for (const artist of artistsWithSpotify) {
+    for (const artist of artistsWithExternalIds) {
       try {
         console.log(`🔄 Updating artist: ${artist.name}`);
 
-        // Get latest discography from Spotify
-        const discography = await getArtistDiscography(artist.spotifyId!);
+        // Re-search for artist to get latest discography
+        const musicResult = await musicAPI.findArtist(artist.name);
+        
+        if (!musicResult) {
+          console.log(`⚠️ Artist "${artist.name}" no longer found in music services`);
+          continue;
+        }
+
+        const { artist: updatedArtist, albums: discography } = musicResult;
         
         let newReleases = 0;
         let skippedReleases = 0;
 
         for (const album of discography) {
           // Check if release already exists
-          if (await releaseExists(album.id, artist.id, album.name)) {
+          if (await releaseExists(album.id, artist.id, album.title, album.source)) {
             skippedReleases++;
             continue;
           }
 
           // Create new release
-          await createReleaseFromSpotifyAlbum(album, artist.id);
+          await createReleaseFromAlbum(album, artist.id, album.source);
           newReleases++;
 
-          console.log(`  ✅ Added: "${album.name}" (${album.album_type})`);
+          console.log(`  ✅ Added: "${album.title}" (${album.albumType})`);
         }
 
         if (newReleases > 0) {
@@ -269,7 +296,7 @@ export async function updateAllArtists(): Promise<ImportStats> {
         console.log(`  📊 ${artist.name}: +${newReleases} новых, ~${skippedReleases} пропущено`);
 
         // Rate limiting between artists
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
       } catch (error) {
         console.error(`❌ Error updating artist "${artist.name}":`, error);
@@ -287,8 +314,8 @@ export async function updateAllArtists(): Promise<ImportStats> {
   }
 }
 
-// Import music from multiple Yandex playlists
-export async function importFromMultipleYandexPlaylists(playlistUrls: string[]): Promise<ImportStats> {
+// Import music from multiple Russian music playlists
+export async function importFromMultipleRussianPlaylists(playlistUrls: string[]): Promise<ImportStats> {
   const totalStats: ImportStats = {
     newArtists: 0,
     updatedArtists: 0,
@@ -297,29 +324,65 @@ export async function importFromMultipleYandexPlaylists(playlistUrls: string[]):
     errors: []
   };
   
-  for (const url of playlistUrls) {
+  console.log(`🎵 Starting batch import from ${playlistUrls.length} playlists...`);
+  
+  // Use the batch parser for efficiency
+  const parseResult = await parseMultiplePlaylists(playlistUrls);
+  
+  console.log(`📊 Batch parsing completed:`);
+  console.log(`   ✅ Успешно: ${parseResult.successful.length} плейлистов`);
+  console.log(`   ❌ Неудачно: ${parseResult.failed.length} плейлистов`);
+  
+  // Collect all unique artists from all successful playlists
+  const allUniqueArtists = new Set<string>();
+  parseResult.successful.forEach(playlist => {
+    playlist.uniqueArtists.forEach(artist => allUniqueArtists.add(artist));
+  });
+  
+  console.log(`👨‍🎤 Total unique artists found: ${allUniqueArtists.size}`);
+  
+  // Process each unique artist
+  for (const artistName of Array.from(allUniqueArtists)) {
     try {
-      const stats = await importFromYandexPlaylist(url);
+      const stats = await processArtist(artistName);
       
-      totalStats.newArtists += stats.newArtists;
-      totalStats.updatedArtists += stats.updatedArtists;
       totalStats.newReleases += stats.newReleases;
       totalStats.skippedReleases += stats.skippedReleases;
-      totalStats.errors.push(...stats.errors);
       
-      // Longer delay between playlists
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      if (stats.error) {
+        totalStats.errors.push(`${artistName}: ${stats.error}`);
+      } else {
+        if (stats.newReleases > 0) {
+          totalStats.newArtists++;
+        }
+      }
+      
+      // Rate limiting between artists
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
     } catch (error) {
-      console.error(`Error importing from playlist ${url}:`, error);
-      totalStats.errors.push(`${url}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`❌ Error processing artist ${artistName}:`, error);
+      totalStats.errors.push(`${artistName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+  
+  // Add failed playlists to errors
+  parseResult.failed.forEach(url => {
+    totalStats.errors.push(`Failed to parse playlist: ${url}`);
+  });
+  
+  console.log(`✅ Batch import completed. New releases: ${totalStats.newReleases}, Artists: ${totalStats.newArtists}, Errors: ${totalStats.errors.length}`);
   
   return totalStats;
 }
 
-// Update existing artists (check for new releases)
+// Обратная совместимость
+export async function importFromMultipleYandexPlaylists(playlistUrls: string[]): Promise<ImportStats> {
+  console.log(`⚠️ importFromMultipleYandexPlaylists is deprecated, use importFromMultipleRussianPlaylists instead`);
+  return importFromMultipleRussianPlaylists(playlistUrls);
+}
+
+// Update existing artists (check for new releases) - using combined API
 export async function updateExistingArtists(): Promise<ImportStats> {
   const stats: ImportStats = {
     newArtists: 0,
@@ -330,42 +393,47 @@ export async function updateExistingArtists(): Promise<ImportStats> {
   };
   
   try {
-    // Get all artists with Spotify IDs that haven't been updated in the last 24 hours
+    // Get all artists with external music service IDs that haven't been updated in the last 24 hours
     const existingArtists = await db.select()
       .from(artists)
       .where(
         and(
-          sql`${artists.spotifyId} IS NOT NULL`,
+          sql`((deezer_id IS NOT NULL AND deezer_id != '') OR (itunes_id IS NOT NULL AND itunes_id != ''))`,
           sql`${artists.lastUpdated} < NOW() - INTERVAL '1 day'`
         )
       );
     
-    console.log(`Updating ${existingArtists.length} existing artists`);
+    console.log(`🔄 Updating ${existingArtists.length} existing artists...`);
     
     for (const artist of existingArtists) {
-      if (!artist.spotifyId) continue;
-      
       try {
-        console.log(`Updating artist: ${artist.name}`);
+        console.log(`🔄 Updating artist: ${artist.name}`);
         
-        // Get updated discography from Spotify
-        const discography = await getArtistDiscography(artist.spotifyId);
+        // Re-search for artist to get latest discography
+        const musicResult = await musicAPI.findArtist(artist.name);
+        
+        if (!musicResult) {
+          console.log(`⚠️ Artist "${artist.name}" no longer found in music services`);
+          continue;
+        }
+
+        const { albums: discography } = musicResult;
         
         let newReleases = 0;
         let skippedReleases = 0;
         
         for (const album of discography) {
           // Check if release already exists
-          if (await releaseExists(album.id, artist.id, album.name)) {
+          if (await releaseExists(album.id, artist.id, album.title, album.source)) {
             skippedReleases++;
             continue;
           }
           
           // Create new release
-          await createReleaseFromSpotifyAlbum(album, artist.id);
+          await createReleaseFromAlbum(album, artist.id, album.source);
           newReleases++;
           
-          console.log(`Added new release: "${album.name}" by ${artist.name}`);
+          console.log(`  ✅ Added new release: "${album.title}" by ${artist.name}`);
         }
         
         // Update last updated timestamp
@@ -380,16 +448,18 @@ export async function updateExistingArtists(): Promise<ImportStats> {
           stats.updatedArtists++;
         }
         
+        console.log(`  📊 ${artist.name}: +${newReleases} новых, ~${skippedReleases} пропущено`);
+        
         // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         
       } catch (error) {
-        console.error(`Error updating artist ${artist.name}:`, error);
+        console.error(`❌ Error updating artist ${artist.name}:`, error);
         stats.errors.push(`${artist.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     }
     
-    console.log(`Artist update completed. New releases: ${stats.newReleases}, Updated artists: ${stats.updatedArtists}`);
+    console.log(`✅ Artist update completed. New releases: ${stats.newReleases}, Updated artists: ${stats.updatedArtists}`);
     
     return stats;
     
