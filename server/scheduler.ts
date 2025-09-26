@@ -1,20 +1,7 @@
 import { importFromYandexPlaylist, updateAllArtists } from './music-importer';
 import { createImportJob } from './background-jobs';
+import { storage } from './storage';
 import * as cron from 'node-cron';
-
-// Список плейлистов MTS Music для автоматического импорта
-// Добавьте сюда URL-адреса плейлистов которые нужно парсить каждый день
-const MTS_MUSIC_PLAYLISTS = [
-  'https://music.mts.ru/chart', // Основной чарт MTS
-  // Добавьте дополнительные плейлисты MTS Music здесь:
-  // 'https://music.mts.ru/playlist/other-playlist-url',
-];
-
-// Яндекс плейлисты (отключены, так как парсинг не работает)
-// const YANDEX_PLAYLISTS = [
-//   'https://music.yandex.ru/chart',
-//   'https://music.yandex.ru/playlists/...',
-// ];
 
 export async function runDailyMusicImport() {
   console.log('🎵 Запуск ежедневного импорта музыки...');
@@ -27,30 +14,41 @@ export async function runDailyMusicImport() {
     errors: [] as string[]
   };
 
-  // 1. Импорт новых артистов из MTS Music плейлистов (через фоновые задания)
-  console.log('📋 Запускаем фоновые задания для плейлистов MTS Music...');
+  // 1. Получаем активные плейлисты из БД
+  console.log('📋 Получаем активные плейлисты для автоимпорта...');
+  
+  const activePlayLists = await storage.getAutoImportPlaylists();
+  const enabledPlaylists = activePlayLists.filter(playlist => playlist.enabled);
+  
+  console.log(`📊 Найдено ${enabledPlaylists.length} активных плейлистов из ${activePlayLists.length} общих`);
+  
+  if (enabledPlaylists.length === 0) {
+    console.log('⚠️ Нет активных плейлистов для импорта. Пропускаем этап импорта из плейлистов.');
+  } else {
+    console.log('🚀 Запускаем фоновые задания для активных плейлистов...');
+  }
   
   const backgroundJobIds: number[] = [];
   
-  for (const playlistUrl of MTS_MUSIC_PLAYLISTS) {
+  for (const playlist of enabledPlaylists) {
     try {
-      console.log(`🔄 Запускаем фоновое задание для плейлиста: ${playlistUrl}`);
+      console.log(`🔄 Запускаем фоновое задание для плейлиста: ${playlist.name} (${playlist.url})`);
       
       const jobId = await createImportJob({
-        playlistUrl,
+        playlistUrl: playlist.url,
         status: 'pending',
         createdBy: 'system', // Автоматический планировщик
       });
       backgroundJobIds.push(jobId);
       
-      console.log(`✅ Фоновое задание #${jobId} запущено для плейлиста`);
+      console.log(`✅ Фоновое задание #${jobId} запущено для плейлиста "${playlist.name}"`);
       
       // Небольшая пауза между запусками заданий
       await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error) {
-      console.error(`❌ Ошибка при запуске фонового задания для плейлиста ${playlistUrl}:`, error);
-      totalStats.errors.push(`Background job for ${playlistUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`❌ Ошибка при запуске фонового задания для плейлиста ${playlist.name}:`, error);
+      totalStats.errors.push(`Background job for ${playlist.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
   
