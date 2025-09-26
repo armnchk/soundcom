@@ -428,7 +428,7 @@ export class RussianMusicParserFactory {
   }
   
   static async parseAnyPlaylist(url: string): Promise<PlaylistParseResult | null> {
-    const parser = this.createParser(url);
+    const parser = RussianMusicParserFactory.createParser(url);
     
     if (!parser) {
       console.error(`❌ Неподдерживаемый сервис для URL: ${url}`);
@@ -451,7 +451,7 @@ export class RussianMusicParserFactory {
     
     for (const url of urls) {
       try {
-        const result = await this.parseAnyPlaylist(url);
+        const result = await RussianMusicParserFactory.parseAnyPlaylist(url);
         
         if (result && result.tracks.length > 0) {
           successful.push(result);
