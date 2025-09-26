@@ -21,7 +21,7 @@ export default function Admin() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'releases' | 'reports' | 'users' | 'import' | 'browse' | 'collections' | 'music-import'>('releases');
+  const [activeTab, setActiveTab] = useState<'releases' | 'reports' | 'users' | 'import' | 'browse' | 'collections' | 'music-import' | 'playlists'>('releases');
   const [releaseForm, setReleaseForm] = useState({
     title: '',
     artistName: '',
@@ -204,6 +204,14 @@ export default function Admin() {
             <Download className="w-4 h-4 mr-2" />
             Импорт музыки
           </Button>
+          <Button
+            variant={activeTab === 'playlists' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('playlists')}
+            data-testid="tab-playlists"
+          >
+            <List className="w-4 h-4 mr-2" />
+            Плейлисты
+          </Button>
         </div>
 
         {/* Manage Releases Tab */}
@@ -343,6 +351,11 @@ export default function Admin() {
         {/* Music Import Tab */}
         {activeTab === 'music-import' && (
           <YandexMusicImportTab />
+        )}
+
+        {/* Playlists Tab */}
+        {activeTab === 'playlists' && (
+          <PlaylistsTab />
         )}
       </main>
 
@@ -1638,6 +1651,313 @@ function CollectionsTab() {
                       </div>
                     </div>
                   )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// Компонент для управления плейлистами автоимпорта
+function PlaylistsTab() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [playlistForm, setPlaylistForm] = useState({
+    name: '',
+    url: '',
+    enabled: true,
+    sortOrder: 0
+  });
+  const [isEditing, setIsEditing] = useState<number | null>(null);
+
+  const { data: playlists = [], isLoading } = useQuery<any[]>({
+    queryKey: ["/api/auto-import-playlists"],
+    enabled: true,
+  });
+
+  const createPlaylistMutation = useMutation({
+    mutationFn: async (data: typeof playlistForm) => {
+      const response = await apiRequest('POST', '/api/auto-import-playlists', data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auto-import-playlists"] });
+      setPlaylistForm({ name: '', url: '', enabled: true, sortOrder: 0 });
+      toast({
+        title: "Плейлист добавлен",
+        description: "Новый плейлист успешно добавлен в автоимпорт.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось добавить плейлист.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePlaylistMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: number } & Partial<typeof playlistForm>) => {
+      const response = await apiRequest('PUT', `/api/auto-import-playlists/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auto-import-playlists"] });
+      setIsEditing(null);
+      toast({
+        title: "Плейлист обновлен",
+        description: "Плейлист успешно обновлен.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось обновить плейлист.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePlaylistMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest('DELETE', `/api/auto-import-playlists/${id}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auto-import-playlists"] });
+      toast({
+        title: "Плейлист удален",
+        description: "Плейлист удален из автоимпорта.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка",
+        description: error.message || "Не удалось удалить плейлист.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!playlistForm.name.trim() || !playlistForm.url.trim()) {
+      toast({
+        title: "Ошибка",
+        description: "Название и URL обязательны для заполнения.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createPlaylistMutation.mutate(playlistForm);
+  };
+
+  const handleEdit = (playlist: any) => {
+    setIsEditing(playlist.id);
+    setPlaylistForm({
+      name: playlist.name,
+      url: playlist.url,
+      enabled: playlist.enabled,
+      sortOrder: playlist.sortOrder
+    });
+  };
+
+  const handleUpdate = (id: number) => {
+    if (!playlistForm.name.trim() || !playlistForm.url.trim()) {
+      toast({
+        title: "Ошибка",
+        description: "Название и URL обязательны для заполнения.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    updatePlaylistMutation.mutate({ id, ...playlistForm });
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(null);
+    setPlaylistForm({ name: '', url: '', enabled: true, sortOrder: 0 });
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card className="bg-card border-border">
+        <CardContent className="p-6">
+          <h3 className="text-xl font-semibold text-white mb-4">Управление плейлистами автоимпорта</h3>
+          
+          <Alert className="mb-6">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              Здесь вы можете добавлять, редактировать и удалять плейлисты из российских музыкальных сервисов для автоматического импорта музыки.
+              Система ежедневно проверяет указанные плейлисты и добавляет новые релизы в базу данных.
+            </AlertDescription>
+          </Alert>
+
+          {/* Форма добавления/редактирования */}
+          <form onSubmit={handleSubmit} className="space-y-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="playlist-name" className="text-white">
+                  Название плейлиста
+                </Label>
+                <Input
+                  id="playlist-name"
+                  type="text"
+                  value={playlistForm.name}
+                  onChange={(e) => setPlaylistForm({ ...playlistForm, name: e.target.value })}
+                  placeholder="Новинки хип-хопа"
+                  className="text-white"
+                  data-testid="input-playlist-name"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="playlist-url" className="text-white">
+                  URL плейлиста
+                </Label>
+                <Input
+                  id="playlist-url"
+                  type="url"
+                  value={playlistForm.url}
+                  onChange={(e) => setPlaylistForm({ ...playlistForm, url: e.target.value })}
+                  placeholder="https://music.mts.ru/playlist/..."
+                  className="text-white"
+                  data-testid="input-playlist-url"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center space-x-2">
+                <Switch
+                  id="playlist-enabled"
+                  checked={playlistForm.enabled}
+                  onCheckedChange={(checked) => setPlaylistForm({ ...playlistForm, enabled: checked })}
+                  data-testid="switch-playlist-enabled"
+                />
+                <Label htmlFor="playlist-enabled" className="text-white">
+                  Активен
+                </Label>
+              </div>
+              
+              <div>
+                <Label htmlFor="playlist-order" className="text-white">
+                  Порядок сортировки
+                </Label>
+                <Input
+                  id="playlist-order"
+                  type="number"
+                  value={playlistForm.sortOrder}
+                  onChange={(e) => setPlaylistForm({ ...playlistForm, sortOrder: parseInt(e.target.value) || 0 })}
+                  placeholder="0"
+                  className="text-white"
+                  data-testid="input-playlist-order"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              {isEditing ? (
+                <>
+                  <Button
+                    type="button"
+                    onClick={() => handleUpdate(isEditing)}
+                    disabled={updatePlaylistMutation.isPending}
+                    data-testid="button-update-playlist"
+                  >
+                    Обновить плейлист
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    data-testid="button-cancel-edit"
+                  >
+                    Отмена
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="submit"
+                  disabled={createPlaylistMutation.isPending}
+                  data-testid="button-add-playlist"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Добавить плейлист
+                </Button>
+              )}
+            </div>
+          </form>
+
+          {/* Список плейлистов */}
+          {isLoading ? (
+            <div className="text-center text-white/70 py-8">Загрузка плейлистов...</div>
+          ) : playlists.length === 0 ? (
+            <div className="text-center text-white/70 py-8">
+              Нет добавленных плейлистов. Добавьте первый плейлист выше.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h4 className="text-lg font-medium text-white">Текущие плейлисты ({playlists.length})</h4>
+              
+              {playlists.map((playlist: any) => (
+                <div
+                  key={playlist.id}
+                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                  data-testid={`playlist-item-${playlist.id}`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h5 className="font-medium text-white" data-testid={`text-playlist-name-${playlist.id}`}>
+                        {playlist.name}
+                      </h5>
+                      <span
+                        className={`px-2 py-1 text-xs rounded ${
+                          playlist.enabled 
+                            ? 'bg-green-500/20 text-green-400' 
+                            : 'bg-red-500/20 text-red-400'
+                        }`}
+                        data-testid={`status-playlist-${playlist.id}`}
+                      >
+                        {playlist.enabled ? 'Активен' : 'Отключен'}
+                      </span>
+                    </div>
+                    <p className="text-sm text-white/70 mb-1" data-testid={`text-playlist-url-${playlist.id}`}>
+                      {playlist.url}
+                    </p>
+                    <p className="text-xs text-white/50">
+                      Порядок: {playlist.sortOrder} • 
+                      Создан: {new Date(playlist.createdAt).toLocaleDateString('ru-RU')} •
+                      Обновлен: {new Date(playlist.updatedAt).toLocaleDateString('ru-RU')}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(playlist)}
+                      disabled={isEditing === playlist.id}
+                      data-testid={`button-edit-${playlist.id}`}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => deletePlaylistMutation.mutate(playlist.id)}
+                      disabled={deletePlaylistMutation.isPending}
+                      data-testid={`button-delete-${playlist.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
