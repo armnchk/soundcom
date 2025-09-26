@@ -1084,11 +1084,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
+      console.log("Received playlist data:", JSON.stringify(req.body, null, 2));
+      
       const validated = insertAutoImportPlaylistSchema.parse(req.body);
+      console.log("Validated playlist data:", JSON.stringify(validated, null, 2));
+      
       const playlist = await storage.createAutoImportPlaylist(validated);
       res.json(playlist);
     } catch (error) {
       console.error("Error creating auto playlist:", error);
+      if (error instanceof z.ZodError) {
+        console.error("Zod validation errors:", JSON.stringify(error.errors, null, 2));
+        return res.status(400).json({ 
+          message: "Ошибка валидации", 
+          errors: error.errors.map(e => ({
+            field: e.path.join('.'),
+            message: e.message
+          }))
+        });
+      }
       res.status(500).json({ message: "Failed to create playlist" });
     }
   });
