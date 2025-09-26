@@ -307,7 +307,7 @@ export const autoImportPlaylists = pgTable('auto_import_playlists', {
   url: text('url').notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   description: text('description'),
-  isActive: boolean('is_active').default(true),
+  enabled: boolean('enabled').default(true),
   service: varchar('service', { length: 50 }).default('mts'), // 'mts', 'yandex', etc.
   lastImportAt: timestamp('last_import_at'),
   sortOrder: integer('sort_order').default(0),

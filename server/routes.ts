@@ -1060,7 +1060,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Auto Import Playlists management (Admin only)
-  app.get('/api/admin/auto-playlists', isAuthenticated, async (req: any, res) => {
+  app.get('/api/auto-import-playlists', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -1076,7 +1076,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/auto-playlists', isAuthenticated, async (req: any, res) => {
+  app.post('/api/auto-import-playlists', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -1093,7 +1093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/admin/auto-playlists/:id', isAuthenticated, async (req: any, res) => {
+  app.put('/api/auto-import-playlists/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
@@ -1111,7 +1111,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/admin/auto-playlists/:id', isAuthenticated, async (req: any, res) => {
+  app.delete('/api/auto-import-playlists/:id', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
