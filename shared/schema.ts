@@ -42,6 +42,13 @@ export const users = pgTable("users", {
 export const artists = pgTable("artists", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
+  spotifyId: varchar("spotify_id", { length: 255 }),
+  yandexMusicId: varchar("yandex_music_id", { length: 255 }),
+  yandexMusicUrl: text("yandex_music_url"),
+  genres: text("genres").array(),
+  popularity: integer("popularity"),
+  followers: integer("followers"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -49,10 +56,12 @@ export const releases = pgTable("releases", {
   id: serial("id").primaryKey(),
   artistId: integer("artist_id").references(() => artists.id),
   title: varchar("title", { length: 255 }).notNull(),
-  type: varchar("type", { length: 50 }).default("album"), // "single" or "album"
+  type: varchar("type", { length: 50 }).default("album"), // "album", "single", or "compilation"
   releaseDate: timestamp("release_date"),
   coverUrl: text("cover_url"),
   streamingLinks: jsonb("streaming_links"),
+  spotifyId: varchar("spotify_id", { length: 255 }),
+  totalTracks: integer("total_tracks"),
   isTestData: boolean("is_test_data").default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });

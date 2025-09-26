@@ -76,7 +76,7 @@ export interface SpotifyAlbum {
 export async function searchSpotifyArtist(artistName: string): Promise<SpotifyArtistInfo | null> {
   try {
     const spotify = await getUncachableSpotifyClient();
-    const searchResults = await spotify.search(artistName, ['artist'], 'RU', 1);
+    const searchResults = await spotify.search(artistName, ['artist'], undefined, 1);
     
     if (searchResults.artists.items.length === 0) {
       return null;
@@ -109,7 +109,7 @@ export async function getArtistDiscography(artistId: string): Promise<SpotifyAlb
       const limit = 50;
       
       while (true) {
-        const response = await spotify.artists.albums(artistId, albumType, 'RU', limit, offset);
+        const response = await spotify.artists.albums(artistId, albumType, undefined, limit, offset);
         
         if (response.items.length === 0) {
           break;
