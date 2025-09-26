@@ -524,13 +524,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Playlist URL is required" });
       }
 
-      if (!playlistUrl.includes('music.yandex.ru')) {
-        return res.status(400).json({ message: "Invalid Yandex Music URL" });
+      if (!playlistUrl.includes('music.mts.ru') && !playlistUrl.includes('music.yandex.ru')) {
+        return res.status(400).json({ message: "Invalid playlist URL - supported: MTS Music, Yandex Music" });
       }
 
       // Import from playlist using the music importer
       const musicImporter = await import('./music-importer');
-      const result = await musicImporter.importFromYandexPlaylist(playlistUrl);
+      const result = await musicImporter.importFromRussianPlaylist(playlistUrl);
       
       res.json({
         success: true,
@@ -811,8 +811,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Starting test import from playlist: ${playlistUrl}`);
       
       // Import using our music importer
-      const { importFromYandexPlaylist } = await import('./music-importer');
-      const stats = await importFromYandexPlaylist(playlistUrl);
+      const { importFromRussianPlaylist } = await import('./music-importer');
+      const stats = await importFromRussianPlaylist(playlistUrl);
       
       res.json({
         success: true,

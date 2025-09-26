@@ -351,7 +351,7 @@ export default function Admin() {
   );
 }
 
-// Новый компонент для импорта из Яндекс Музыки
+// Компонент для импорта из российских музыкальных сервисов
 function YandexMusicImportTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -423,10 +423,10 @@ function YandexMusicImportTab() {
       return;
     }
 
-    if (!playlistUrl.includes('music.yandex.ru')) {
+    if (!playlistUrl.includes('music.mts.ru') && !playlistUrl.includes('music.yandex.ru')) {
       toast({
         title: "Ошибка",
-        description: "Пожалуйста, введите корректную ссылку на плейлист Яндекс Музыки",
+        description: "Пожалуйста, введите корректную ссылку на плейлист (MTS Music или Яндекс Музыка)",
         variant: "destructive",
       });
       return;
@@ -436,11 +436,11 @@ function YandexMusicImportTab() {
   };
 
   const predefinedPlaylists = [
-    { name: "Чарт", url: "https://music.yandex.ru/chart" },
+    { name: "🔥 MTS Чарт", url: "https://music.mts.ru/chart" },
+    { name: "Чарт Яндекс", url: "https://music.yandex.ru/chart" },
     { name: "Новые релизы", url: "https://music.yandex.ru/playlists/2111e2b6-587d-a600-2fea-54df7c314477" },
     { name: "Indie Rock", url: "https://music.yandex.ru/playlists/3c5d7e75-c8ea-55af-9689-2263608117ba" },
-    { name: "Russian Hip-Hop", url: "https://music.yandex.ru/playlists/83d59684-4c03-783a-8a27-8a04d52edb95" },
-    { name: "Электроника", url: "https://music.yandex.ru/playlists/be0f3522-0e50-fe5d-8a01-8a0146041ccd" }
+    { name: "Russian Hip-Hop", url: "https://music.yandex.ru/playlists/83d59684-4c03-783a-8a27-8a04d52edb95" }
   ];
 
   return (
@@ -450,9 +450,9 @@ function YandexMusicImportTab() {
           <div className="flex items-center gap-3 mb-6">
             <Download className="w-6 h-6 text-primary" />
             <div>
-              <h3 className="text-xl font-semibold text-white">Импорт музыки из Яндекс Музыки</h3>
+              <h3 className="text-xl font-semibold text-white">Импорт музыки из российских сервисов</h3>
               <p className="text-white/70 text-sm">
-                Автоматический импорт релизов через Spotify API на основе плейлистов Яндекс Музыки
+                Автоматический импорт релизов через Deezer/iTunes API на основе плейлистов MTS Music и Яндекс Музыки
               </p>
             </div>
           </div>
@@ -482,11 +482,11 @@ function YandexMusicImportTab() {
           {/* Test Import Section */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="playlist-url" className="text-white">URL плейлиста Яндекс Музыки</Label>
+              <Label htmlFor="playlist-url" className="text-white">URL плейлиста (MTS Music или Яндекс Музыка)</Label>
               <div className="flex gap-2 mt-1">
                 <Input
                   id="playlist-url"
-                  placeholder="https://music.yandex.ru/playlists/..."
+                  placeholder="https://music.mts.ru/chart или https://music.yandex.ru/playlists/..."
                   value={playlistUrl}
                   onChange={(e) => setPlaylistUrl(e.target.value)}
                   className="text-white"
