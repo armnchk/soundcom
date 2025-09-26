@@ -536,7 +536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         stats: result
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error testing playlist import:", error);
       res.status(500).json({ message: error.message || "Failed to import playlist" });
     }
@@ -560,7 +560,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         stats: result
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating artists:", error);
       res.status(500).json({ message: error.message || "Failed to update artists" });
     }
@@ -794,46 +794,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
-  // Music import routes (admin only)
-  app.post('/api/import/test-playlist', isAuthenticated, async (req: any, res) => {
-    try {
-      // Check if user is admin
-      const user = await storage.getUser(req.session.userId);
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Unauthorized" });
-      }
-
-      const { playlistUrl } = req.body;
-      if (!playlistUrl) {
-        return res.status(400).json({ message: "Playlist URL is required" });
-      }
-
-      console.log(`Starting test import from playlist: ${playlistUrl}`);
-      
-      // Import using our music importer
-      const { importFromRussianPlaylist } = await import('./music-importer');
-      const stats = await importFromRussianPlaylist(playlistUrl);
-      
-      res.json({
-        success: true,
-        stats,
-        message: `Import completed: ${stats.newReleases} new releases, ${stats.skippedReleases} skipped, ${stats.errors.length} errors`
-      });
-
-    } catch (error) {
-      console.error("Error during test import:", error);
-      res.status(500).json({ 
-        success: false,
-        message: "Import failed",
-        error: error instanceof Error ? error.message : "Unknown error"
-      });
-    }
-  });
-
   app.post('/api/import/update-artists', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is admin
-      const user = await storage.getUser(req.session.userId);
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
       if (!user?.isAdmin) {
         return res.status(403).json({ message: "Unauthorized" });
       }
@@ -850,7 +815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `Update completed: ${stats.newReleases} new releases, ${stats.updatedArtists} artists updated, ${stats.errors.length} errors`
       });
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error during artist update:", error);
       res.status(500).json({ 
         success: false,
