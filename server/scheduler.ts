@@ -1,51 +1,61 @@
 import { importFromYandexPlaylist, updateAllArtists } from './music-importer';
+import { createImportJob } from './background-jobs';
 import * as cron from 'node-cron';
 
-// Список плейлистов Яндекс Музыки для автоматического импорта
-const YANDEX_PLAYLISTS = [
-  'https://music.yandex.ru/chart', // Чарт
-  'https://music.yandex.ru/playlists/2111e2b6-587d-a600-2fea-54df7c314477', // Новые релизы
-  'https://music.yandex.ru/playlists/3c5d7e75-c8ea-55af-9689-2263608117ba', // Indie Rock
-  'https://music.yandex.ru/playlists/83d59684-4c03-783a-8a27-8a04d52edb95', // Russian Hip-Hop
-  'https://music.yandex.ru/playlists/be0f3522-0e50-fe5d-8a01-8a0146041ccd', // Электроника
+// Список плейлистов MTS Music для автоматического импорта
+// Добавьте сюда URL-адреса плейлистов которые нужно парсить каждый день
+const MTS_MUSIC_PLAYLISTS = [
+  'https://music.mts.ru/chart', // Основной чарт MTS
+  // Добавьте дополнительные плейлисты MTS Music здесь:
+  // 'https://music.mts.ru/playlist/other-playlist-url',
 ];
+
+// Яндекс плейлисты (отключены, так как парсинг не работает)
+// const YANDEX_PLAYLISTS = [
+//   'https://music.yandex.ru/chart',
+//   'https://music.yandex.ru/playlists/...',
+// ];
 
 export async function runDailyMusicImport() {
   console.log('🎵 Запуск ежедневного импорта музыки...');
   
   const startTime = new Date();
   let totalStats = {
-    newArtists: 0,
     updatedArtists: 0,
     newReleases: 0,
     skippedReleases: 0,
     errors: [] as string[]
   };
 
-  // 1. Импорт новых артистов из Яндекс Музыки плейлистов
-  console.log('📋 Обрабатываем плейлисты Яндекс Музыки...');
+  // 1. Импорт новых артистов из MTS Music плейлистов (через фоновые задания)
+  console.log('📋 Запускаем фоновые задания для плейлистов MTS Music...');
   
-  for (const playlistUrl of YANDEX_PLAYLISTS) {
+  const backgroundJobIds: number[] = [];
+  
+  for (const playlistUrl of MTS_MUSIC_PLAYLISTS) {
     try {
-      console.log(`🔄 Импортируем плейлист: ${playlistUrl}`);
+      console.log(`🔄 Запускаем фоновое задание для плейлиста: ${playlistUrl}`);
       
-      const result = await importFromYandexPlaylist(playlistUrl);
+      const jobId = await createImportJob({
+        playlistUrl,
+        status: 'pending',
+        createdBy: 'system', // Автоматический планировщик
+      });
+      backgroundJobIds.push(jobId);
       
-      totalStats.newArtists += result.newArtists;
-      totalStats.newReleases += result.newReleases;
-      totalStats.skippedReleases += result.skippedReleases;
-      totalStats.errors.push(...result.errors);
+      console.log(`✅ Фоновое задание #${jobId} запущено для плейлиста`);
       
-      console.log(`✅ Плейлист обработан: +${result.newReleases} релизов, +${result.newArtists} артистов`);
-      
-      // Пауза между плейлистами
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      // Небольшая пауза между запусками заданий
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
     } catch (error) {
-      console.error(`❌ Ошибка при обработке плейлиста ${playlistUrl}:`, error);
-      totalStats.errors.push(`Playlist ${playlistUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error(`❌ Ошибка при запуске фонового задания для плейлиста ${playlistUrl}:`, error);
+      totalStats.errors.push(`Background job for ${playlistUrl}: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+  
+  console.log(`🚀 Запущено ${backgroundJobIds.length} фоновых заданий для импорта плейлистов`);
+  console.log('⏳ Фоновые задания будут выполняться асинхронно без таймаутов');
 
   // 2. Обновление существующих артистов
   console.log('🔄 Обновляем существующих артистов...');
@@ -71,18 +81,27 @@ export async function runDailyMusicImport() {
   // Финальный отчет
   console.log('\n📊 ИТОГИ ЕЖЕДНЕВНОГО ИМПОРТА:');
   console.log(`⏱️  Время выполнения: ${duration} секунд`);
-  console.log(`🎤 Новых артистов: ${totalStats.newArtists}`);
+  console.log(`🚀 Запущено фоновых заданий для плейлистов: ${backgroundJobIds.length}`);
   console.log(`🔄 Обновлено артистов: ${totalStats.updatedArtists}`);
-  console.log(`💿 Новых релизов: ${totalStats.newReleases}`);
+  console.log(`💿 Новых релизов (только от обновления артистов): ${totalStats.newReleases}`);
   console.log(`⏭️  Пропущено релизов: ${totalStats.skippedReleases}`);
   console.log(`❌ Ошибок: ${totalStats.errors.length}`);
+  
+  if (backgroundJobIds.length > 0) {
+    console.log('\n🎯 ID фоновых заданий для мониторинга:');
+    backgroundJobIds.forEach(jobId => console.log(`  - Задание #${jobId}`));
+    console.log('💡 Следите за прогрессом фоновых заданий в админ-панели');
+  }
   
   if (totalStats.errors.length > 0) {
     console.log('\n🔍 Детали ошибок:');
     totalStats.errors.forEach(error => console.log(`  - ${error}`));
   }
 
-  return totalStats;
+  return {
+    ...totalStats,
+    backgroundJobIds
+  };
 }
 
 // Переменная для хранения активной задачи cron
@@ -105,7 +124,7 @@ export function scheduleDaily() {
     try {
       const stats = await runDailyMusicImport();
       console.log('✅ Автоматический импорт завершен успешно');
-      console.log(`📊 Итого: +${stats.newReleases} релизов, +${stats.newArtists} артистов, ${stats.errors.length} ошибок`);
+      console.log(`📊 Итого: +${stats.newReleases} релизов, ${stats.updatedArtists} обновленных артистов, ${stats.errors.length} ошибок`);
     } catch (error) {
       console.error('❌ Ошибка автоматического импорта:', error);
     }
@@ -180,6 +199,7 @@ export function getSchedulerStatus() {
 export async function manualImportTrigger(playlistUrl?: string) {
   if (playlistUrl) {
     console.log(`🎯 Ручной импорт плейлиста: ${playlistUrl}`);
+    // Для ручного запуска используем старый метод для совместимости
     return await importFromYandexPlaylist(playlistUrl);
   } else {
     console.log('🎯 Ручной запуск полного импорта');
