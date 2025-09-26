@@ -9,6 +9,7 @@ import {
   collections,
   collectionReleases,
   autoImportPlaylists,
+  importLogs,
   type User,
   type UpsertUser,
   type Artist,
@@ -20,6 +21,7 @@ import {
   type Collection,
   type CollectionRelease,
   type SelectAutoImportPlaylist,
+  type ImportLog,
   type InsertArtist,
   type InsertRelease,
   type InsertRating,
@@ -29,6 +31,7 @@ import {
   type InsertCollection,
   type InsertCollectionRelease,
   type InsertAutoImportPlaylist,
+  type InsertImportLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, or, ilike } from "drizzle-orm";
@@ -106,6 +109,12 @@ export interface IStorage {
   createAutoImportPlaylist(playlist: InsertAutoImportPlaylist): Promise<SelectAutoImportPlaylist>;
   updateAutoImportPlaylist(id: number, playlist: Partial<InsertAutoImportPlaylist>): Promise<SelectAutoImportPlaylist>;
   deleteAutoImportPlaylist(id: number): Promise<void>;
+  
+  // Import Logs operations
+  createImportLog(log: InsertImportLog): Promise<ImportLog>;
+  updateImportLog(id: number, log: Partial<InsertImportLog>): Promise<ImportLog>;
+  getImportLogs(limit?: number): Promise<ImportLog[]>;
+  getLatestImportLog(): Promise<ImportLog | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -748,6 +757,38 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAutoImportPlaylist(id: number): Promise<void> {
     await db.delete(autoImportPlaylists).where(eq(autoImportPlaylists.id, id));
+  }
+
+  // Import Logs operations
+  async createImportLog(log: InsertImportLog): Promise<ImportLog> {
+    const [created] = await db.insert(importLogs).values(log).returning();
+    return created;
+  }
+
+  async updateImportLog(id: number, log: Partial<InsertImportLog>): Promise<ImportLog> {
+    const [updated] = await db
+      .update(importLogs)
+      .set(log)
+      .where(eq(importLogs.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getImportLogs(limit: number = 20): Promise<ImportLog[]> {
+    return db
+      .select()
+      .from(importLogs)
+      .orderBy(desc(importLogs.startedAt))
+      .limit(limit);
+  }
+
+  async getLatestImportLog(): Promise<ImportLog | undefined> {
+    const [latest] = await db
+      .select()
+      .from(importLogs)
+      .orderBy(desc(importLogs.startedAt))
+      .limit(1);
+    return latest;
   }
 
 }
