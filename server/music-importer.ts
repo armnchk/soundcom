@@ -198,8 +198,14 @@ export async function importFromRussianPlaylist(playlistUrl: string): Promise<Im
     console.log(`📋 Parsed playlist "${playlistResult.name}" with ${playlistResult.tracks.length} tracks`);
     console.log(`👨‍🎤 Found ${playlistResult.uniqueArtists.length} unique artists`);
     
-    // Process each unique artist
-    for (const artistName of playlistResult.uniqueArtists) {
+    // Process each unique artist (для больших плейлистов ограничиваем до 10 артистов для тестирования)
+    const artistsToProcess = playlistResult.uniqueArtists.length > 50 
+      ? playlistResult.uniqueArtists.slice(0, 10)
+      : playlistResult.uniqueArtists;
+    
+    console.log(`👨‍🎤 Processing ${artistsToProcess.length} artists (из ${playlistResult.uniqueArtists.length} общих)`);
+    
+    for (const artistName of artistsToProcess) {
       const result = await processArtist(artistName);
       
       stats.newReleases += result.newReleases;
