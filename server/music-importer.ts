@@ -1,6 +1,6 @@
 import { parseYandexPlaylist, extractUniqueArtists } from './yandex-music-parser';
 import { searchSpotifyArtist, getArtistDiscography } from './spotify-client';
-import { db } from './storage';
+import { db } from './db';
 import { artists, releases } from '../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 

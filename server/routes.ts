@@ -719,6 +719,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
 
+  // Music import routes (admin only)
+  app.post('/api/import/test-playlist', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const user = await storage.getUser(req.session.userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      const { playlistUrl } = req.body;
+      if (!playlistUrl) {
+        return res.status(400).json({ message: "Playlist URL is required" });
+      }
+
+      console.log(`Starting test import from playlist: ${playlistUrl}`);
+      
+      // Import using our music importer
+      const { importFromYandexPlaylist } = await import('./music-importer');
+      const stats = await importFromYandexPlaylist(playlistUrl);
+      
+      res.json({
+        success: true,
+        stats,
+        message: `Import completed: ${stats.newReleases} new releases, ${stats.skippedReleases} skipped, ${stats.errors.length} errors`
+      });
+
+    } catch (error) {
+      console.error("Error during test import:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Import failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.post('/api/import/update-artists', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const user = await storage.getUser(req.session.userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      console.log(`Starting artist update process`);
+      
+      // Update existing artists
+      const { updateExistingArtists } = await import('./music-importer');
+      const stats = await updateExistingArtists();
+      
+      res.json({
+        success: true,
+        stats,
+        message: `Update completed: ${stats.newReleases} new releases, ${stats.updatedArtists} artists updated, ${stats.errors.length} errors`
+      });
+
+    } catch (error) {
+      console.error("Error during artist update:", error);
+      res.status(500).json({ 
+        success: false,
+        message: "Update failed",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
+  app.get('/api/import/stats', isAuthenticated, async (req: any, res) => {
+    try {
+      // Check if user is admin
+      const user = await storage.getUser(req.session.userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Unauthorized" });
+      }
+
+      // Get database statistics - we'll add these methods to storage interface
+      const totalArtists = 0; // await storage.getArtistCount();
+      const totalReleases = 0; // await storage.getReleaseCount();
+      const artistsWithSpotify = 0; // await storage.getArtistsWithSpotifyCount();
+      const recentReleases = 0; // await storage.getRecentReleasesCount(7);
+
+      res.json({
+        totalArtists,
+        totalReleases,
+        artistsWithSpotify,
+        recentReleases,
+        spotifyIntegration: artistsWithSpotify > 0 ? 'connected' : 'not_connected'
+      });
+
+    } catch (error) {
+      console.error("Error getting import stats:", error);
+      res.status(500).json({ message: "Failed to fetch import stats" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
