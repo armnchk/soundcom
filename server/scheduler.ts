@@ -14,6 +14,21 @@ export async function runDailyMusicImport() {
     errors: [] as string[]
   };
 
+  // Создаем лог импорта
+  console.log('📝 Создаем лог автоматического импорта...');
+  const importLog = await storage.createImportLog({
+    startedAt: startTime,
+    status: 'running',
+    type: 'scheduled',
+    totalPlaylists: 0,
+    processedPlaylists: 0,
+    totalArtists: 0,
+    newReleases: 0,
+    skippedReleases: 0,
+    errors: 0,
+    playlistResults: []
+  });
+
   // 1. Получаем активные плейлисты из БД
   console.log('📋 Получаем активные плейлисты для автоимпорта...');
   
@@ -21,6 +36,11 @@ export async function runDailyMusicImport() {
   const enabledPlaylists = activePlayLists.filter(playlist => playlist.enabled);
   
   console.log(`📊 Найдено ${enabledPlaylists.length} активных плейлистов из ${activePlayLists.length} общих`);
+  
+  // Обновляем лог с количеством плейлистов
+  await storage.updateImportLog(importLog.id, {
+    totalPlaylists: enabledPlaylists.length
+  });
   
   if (enabledPlaylists.length === 0) {
     console.log('⚠️ Нет активных плейлистов для импорта. Пропускаем этап импорта из плейлистов.');
@@ -76,8 +96,27 @@ export async function runDailyMusicImport() {
   const endTime = new Date();
   const duration = Math.round((endTime.getTime() - startTime.getTime()) / 1000);
 
+  // Обновляем лог импорта с финальными результатами
+  console.log('📝 Обновляем лог импорта с результатами...');
+  await storage.updateImportLog(importLog.id, {
+    completedAt: endTime,
+    status: totalStats.errors.length > 0 ? 'completed' : 'completed', // Всегда completed, даже с ошибками
+    processedPlaylists: backgroundJobIds.length,
+    newReleases: totalStats.newReleases,
+    skippedReleases: totalStats.skippedReleases,
+    errors: totalStats.errors.length,
+    errorMessage: totalStats.errors.length > 0 ? totalStats.errors.join('; ') : null,
+    playlistResults: enabledPlaylists.map((playlist, index) => ({
+      playlistName: playlist.name,
+      playlistUrl: playlist.url,
+      jobId: backgroundJobIds[index] || null,
+      status: backgroundJobIds[index] ? 'started' : 'skipped'
+    }))
+  });
+
   // Финальный отчет
   console.log('\n📊 ИТОГИ ЕЖЕДНЕВНОГО ИМПОРТА:');
+  console.log(`📝 Лог импорта #${importLog.id} создан и обновлен`);
   console.log(`⏱️  Время выполнения: ${duration} секунд`);
   console.log(`🚀 Запущено фоновых заданий для плейлистов: ${backgroundJobIds.length}`);
   console.log(`🔄 Обновлено артистов: ${totalStats.updatedArtists}`);
@@ -98,7 +137,8 @@ export async function runDailyMusicImport() {
 
   return {
     ...totalStats,
-    backgroundJobIds
+    backgroundJobIds,
+    importLogId: importLog.id
   };
 }
 
