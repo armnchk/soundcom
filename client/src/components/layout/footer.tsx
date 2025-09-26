@@ -22,13 +22,13 @@ export default function Footer() {
             <h3 className="font-semibold text-foreground mb-3 text-sm">Explore</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link href="/">
-                  <a className="hover:text-foreground transition-colors">New Releases</a>
+                <Link href="/" className="hover:text-foreground transition-colors">
+                  New Releases
                 </Link>
               </li>
               <li>
-                <Link href="/search">
-                  <a className="hover:text-foreground transition-colors">Search</a>
+                <Link href="/search" className="hover:text-foreground transition-colors">
+                  Search
                 </Link>
               </li>
               <li>
