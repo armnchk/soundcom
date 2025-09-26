@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { StarRating } from "../release/rating-display";
 import { ThumbsUp, ThumbsDown, Flag, Edit, Trash2, User } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -138,12 +137,9 @@ export function CommentItem({
               {displayName}
             </span>
             {comment.rating && (
-              <StarRating 
-                rating={comment.rating} 
-                maxRating={10} 
-                size="sm"
-                showValue
-              />
+              <span className="text-sm font-medium text-primary" data-testid="comment-rating">
+                {comment.rating}/10
+              </span>
             )}
             <span className="text-xs text-muted-foreground" data-testid="text-date">
               {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}

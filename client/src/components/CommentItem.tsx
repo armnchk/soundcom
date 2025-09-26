@@ -1,6 +1,5 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { StarRating } from "./StarRating";
 import { ThumbsUp, ThumbsDown, Flag, Edit, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -62,12 +61,9 @@ export function CommentItem({
               {displayName}
             </span>
             {comment.rating && (
-              <StarRating 
-                rating={comment.rating} 
-                maxRating={10} 
-                size="sm"
-                data-testid="comment-rating"
-              />
+              <span className="text-sm font-medium text-primary" data-testid="comment-rating">
+                {comment.rating}/10
+              </span>
             )}
             <span className="text-xs text-muted-foreground" data-testid="comment-date">
               {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}

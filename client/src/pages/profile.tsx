@@ -7,7 +7,6 @@ import Footer from "@/components/layout/footer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { StarRating } from "@/components/release/rating-display";
 import { Music, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -186,7 +185,7 @@ export default function Profile() {
                       </div>
                       
                       <div className="flex items-center space-x-2">
-                        <StarRating rating={rating.score} maxRating={10} size="sm" showValue />
+                        <span className="text-sm font-medium text-primary">{rating.score}/10</span>
                         <span className="text-xs text-muted-foreground">
                           {new Date(rating.createdAt).toLocaleDateString()}
                         </span>
@@ -236,7 +235,7 @@ export default function Profile() {
                         <div className="flex items-center gap-2 mb-2">
                           <h4 className="font-medium text-foreground text-sm">{comment.release.title}</h4>
                           {comment.rating && (
-                            <StarRating rating={comment.rating} maxRating={10} size="sm" showValue />
+                            <span className="text-sm font-medium text-primary">{comment.rating}/10</span>
                           )}
                         </div>
                         <p className="text-muted-foreground text-xs mb-2">{comment.release.artist.name}</p>
