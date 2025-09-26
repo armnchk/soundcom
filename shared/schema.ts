@@ -301,6 +301,20 @@ export const importJobs = pgTable('import_jobs', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+// Автопарсинг плейлистов - список URL для ежедневного импорта
+export const autoImportPlaylists = pgTable('auto_import_playlists', {
+  id: serial('id').primaryKey(),
+  url: text('url').notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  isActive: boolean('is_active').default(true),
+  service: varchar('service', { length: 50 }).default('mts'), // 'mts', 'yandex', etc.
+  lastImportAt: timestamp('last_import_at'),
+  sortOrder: integer('sort_order').default(0),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
 export const insertImportJobSchema = createInsertSchema(importJobs).omit({ 
   id: true, 
   createdAt: true 
@@ -308,3 +322,12 @@ export const insertImportJobSchema = createInsertSchema(importJobs).omit({
 
 export type ImportJob = typeof importJobs.$inferSelect;
 export type InsertImportJob = z.infer<typeof insertImportJobSchema>;
+
+// Auto Import Playlists schema
+export const insertAutoImportPlaylistSchema = createInsertSchema(autoImportPlaylists).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true
+});
+export type InsertAutoImportPlaylist = z.infer<typeof insertAutoImportPlaylistSchema>;
+export type SelectAutoImportPlaylist = typeof autoImportPlaylists.$inferSelect;
