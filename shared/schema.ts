@@ -324,10 +324,20 @@ export type ImportJob = typeof importJobs.$inferSelect;
 export type InsertImportJob = z.infer<typeof insertImportJobSchema>;
 
 // Auto Import Playlists schema
-export const insertAutoImportPlaylistSchema = createInsertSchema(autoImportPlaylists).omit({ 
-  id: true, 
-  createdAt: true,
-  updatedAt: true
-});
+export const insertAutoImportPlaylistSchema = createInsertSchema(autoImportPlaylists)
+  .omit({ 
+    id: true, 
+    createdAt: true,
+    updatedAt: true
+  })
+  .extend({
+    url: z.string().min(1, "URL обязателен").url("Введите корректный URL"),
+    name: z.string().min(1, "Название обязательно").max(255, "Название слишком длинное"),
+    sortOrder: z.number().int().min(0, "Порядок сортировки должен быть неотрицательным").optional(),
+    enabled: z.boolean().optional(),
+    service: z.string().optional(),
+    description: z.string().optional(),
+    lastImportAt: z.date().nullable().optional()
+  });
 export type InsertAutoImportPlaylist = z.infer<typeof insertAutoImportPlaylistSchema>;
 export type SelectAutoImportPlaylist = typeof autoImportPlaylists.$inferSelect;
