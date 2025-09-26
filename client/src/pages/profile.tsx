@@ -71,11 +71,7 @@ export default function Profile() {
           <Card>
             <CardContent className="p-12 text-center">
               <h1 className="text-2xl font-bold text-foreground mb-2">Пользователь не найден</h1>
-              <p className="text-muted-foreground mb-4">Профиль пользователя, который вы ищете, не существует.</p>
-              <Button onClick={() => setLocation("/")} data-testid="button-go-home">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                На главную
-              </Button>
+              <p className="text-muted-foreground">Профиль пользователя, который вы ищете, не существует.</p>
             </CardContent>
           </Card>
         </div>

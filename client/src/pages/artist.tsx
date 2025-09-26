@@ -64,11 +64,7 @@ export default function Artist() {
           <Card>
             <CardContent className="p-12 text-center">
               <h1 className="text-2xl font-bold text-foreground mb-2">Artist Not Found</h1>
-              <p className="text-muted-foreground mb-4">The artist you're looking for doesn't exist.</p>
-              <Button onClick={() => setLocation("/")} data-testid="button-go-home">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Go Home
-              </Button>
+              <p className="text-muted-foreground">The artist you're looking for doesn't exist.</p>
             </CardContent>
           </Card>
         </div>
@@ -84,15 +80,6 @@ export default function Artist() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Artist Header */}
         <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => setLocation("/")}
-            className="mb-4"
-            data-testid="button-back"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Home
-          </Button>
           <h1 className="text-4xl font-bold text-foreground mb-2" data-testid="text-artist-name">
             {artist.name}
           </h1>
