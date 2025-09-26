@@ -21,7 +21,7 @@ export default function Admin() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'releases' | 'reports' | 'users' | 'import' | 'browse' | 'collections' | 'music-import' | 'playlists'>('releases');
+  const [activeTab, setActiveTab] = useState<'releases' | 'reports' | 'users' | 'import' | 'browse' | 'collections' | 'music-import' | 'playlists' | 'import-logs'>('releases');
   const [releaseForm, setReleaseForm] = useState({
     title: '',
     artistName: '',
@@ -212,6 +212,14 @@ export default function Admin() {
             <List className="w-4 h-4 mr-2" />
             Плейлисты
           </Button>
+          <Button
+            variant={activeTab === 'import-logs' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('import-logs')}
+            data-testid="tab-import-logs"
+          >
+            <Calendar className="w-4 h-4 mr-2" />
+            Логи импорта
+          </Button>
         </div>
 
         {/* Manage Releases Tab */}
@@ -356,6 +364,11 @@ export default function Admin() {
         {/* Playlists Tab */}
         {activeTab === 'playlists' && (
           <PlaylistsTab />
+        )}
+
+        {/* Import Logs Tab */}
+        {activeTab === 'import-logs' && (
+          <ImportLogsTab />
         )}
       </main>
 
@@ -1960,6 +1973,222 @@ function PlaylistsTab() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ImportLogsTab() {
+  const { toast } = useToast();
+
+  // Получаем историю логов импорта
+  const { data: importLogs = [], isLoading: logsLoading } = useQuery({
+    queryKey: ["/api/import-logs"],
+    queryFn: async () => {
+      const response = await fetch('/api/import-logs');
+      if (!response.ok) throw new Error('Failed to fetch import logs');
+      return response.json();
+    },
+  });
+
+  // Получаем последний лог импорта
+  const { data: latestLog, isLoading: latestLoading } = useQuery({
+    queryKey: ["/api/import-logs/latest"],
+    queryFn: async () => {
+      const response = await fetch('/api/import-logs/latest');
+      if (!response.ok) throw new Error('Failed to fetch latest import log');
+      return response.json();
+    },
+  });
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('ru-RU');
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'running':
+        return 'bg-blue-500/20 text-blue-400';
+      case 'completed':
+        return 'bg-green-500/20 text-green-400';
+      case 'failed':
+        return 'bg-red-500/20 text-red-400';
+      default:
+        return 'bg-gray-500/20 text-gray-400';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'running':
+        return 'Выполняется';
+      case 'completed':
+        return 'Завершен';
+      case 'failed':
+        return 'Ошибка';
+      default:
+        return status;
+    }
+  };
+
+  if (logsLoading || latestLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="text-white/70">Загрузка логов импорта...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Последний импорт */}
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-xl font-bold text-white mb-4">Последний автоматический импорт</h3>
+          {latestLog ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-white/70 mb-1">Статус</div>
+                  <span className={`px-2 py-1 text-xs rounded ${getStatusColor(latestLog.status)}`}>
+                    {getStatusText(latestLog.status)}
+                  </span>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-white/70 mb-1">Начало импорта</div>
+                  <div className="font-medium text-white">{formatDate(latestLog.startedAt)}</div>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-white/70 mb-1">Завершение</div>
+                  <div className="font-medium text-white">
+                    {latestLog.completedAt ? formatDate(latestLog.completedAt) : 'В процессе...'}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-white/70 mb-1">Плейлистов</div>
+                  <div className="text-2xl font-bold text-white">
+                    {latestLog.processedPlaylists}/{latestLog.totalPlaylists}
+                  </div>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-white/70 mb-1">Новых релизов</div>
+                  <div className="text-2xl font-bold text-green-400">{latestLog.newReleases}</div>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-white/70 mb-1">Пропущено</div>
+                  <div className="text-2xl font-bold text-yellow-400">{latestLog.skippedReleases}</div>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-sm text-white/70 mb-1">Ошибок</div>
+                  <div className="text-2xl font-bold text-red-400">{latestLog.errors}</div>
+                </div>
+              </div>
+
+              {/* Детали плейлистов */}
+              {latestLog.playlistResults && latestLog.playlistResults.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-lg font-semibold text-white mb-3">Обработанные плейлисты</h4>
+                  <div className="space-y-2">
+                    {latestLog.playlistResults.map((result: any, index: number) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                        <div>
+                          <div className="font-medium text-white">{result.playlistName}</div>
+                          <div className="text-sm text-white/70">{result.playlistUrl}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {result.jobId && (
+                            <span className="text-xs text-white/50">Job #{result.jobId}</span>
+                          )}
+                          <span className={`px-2 py-1 text-xs rounded ${
+                            result.status === 'started' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {result.status === 'started' ? 'Запущен' : 'Пропущен'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Ошибки */}
+              {latestLog.errorMessage && (
+                <div className="mt-4">
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-white">
+                      <strong>Ошибки импорта:</strong> {latestLog.errorMessage}
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-white/70">
+              Автоматических импортов пока не было
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* История импортов */}
+      <Card>
+        <CardContent className="p-6">
+          <h3 className="text-xl font-bold text-white mb-4">История автоматических импортов</h3>
+          {importLogs.length > 0 ? (
+            <div className="space-y-3">
+              {importLogs.map((log: any) => (
+                <div key={log.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className={`px-2 py-1 text-xs rounded ${getStatusColor(log.status)}`}>
+                        {getStatusText(log.status)}
+                      </span>
+                      <span className="text-sm text-white/70">
+                        {formatDate(log.startedAt)}
+                      </span>
+                      {log.completedAt && (
+                        <span className="text-xs text-white/50">
+                          → {formatDate(log.completedAt)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-white">
+                        Плейлистов: <strong>{log.processedPlaylists}/{log.totalPlaylists}</strong>
+                      </span>
+                      <span className="text-green-400">
+                        Релизов: <strong>{log.newReleases}</strong>
+                      </span>
+                      <span className="text-yellow-400">
+                        Пропущено: <strong>{log.skippedReleases}</strong>
+                      </span>
+                      {log.errors > 0 && (
+                        <span className="text-red-400">
+                          Ошибок: <strong>{log.errors}</strong>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-xs text-white/50">
+                    ID: {log.id}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-white/70">
+              История импортов пуста
             </div>
           )}
         </CardContent>
