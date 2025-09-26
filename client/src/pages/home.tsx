@@ -3,7 +3,10 @@ import { useLocation } from "wouter";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { Card, CardContent } from "@/components/ui/card";
-import { Music, FolderOpen, ArrowRight } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Music, FolderOpen, ArrowRight, Search } from "lucide-react";
+import { useState } from "react";
 
 interface ReleaseWithDetails {
   id: number;
@@ -27,6 +30,7 @@ interface Collection {
 
 export default function Home() {
   const [, setLocation] = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch featured collections
   const { data: collections = [], isLoading: collectionsLoading } = useQuery<Collection[]>({
@@ -40,6 +44,13 @@ export default function Home() {
 
   const handleReleaseClick = (releaseId: number) => {
     setLocation(`/release/${releaseId}`);
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      setLocation(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+    }
   };
 
   if (collectionsLoading) {
@@ -74,6 +85,40 @@ export default function Home() {
       <Navbar />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Search Section */}
+        <section className="mb-12">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4" data-testid="text-hero-title">
+              Найди свою музыку
+            </h1>
+            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-description">
+              Ищи релизы, исполнителей, читай отзывы и ставь оценки
+            </p>
+          </div>
+          
+          <div className="max-w-2xl mx-auto">
+            <form onSubmit={handleSearch} className="relative">
+              <Input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Поиск релизов, исполнителей..."
+                className="w-full pl-12 pr-24 py-6 text-lg bg-background border-2 border-muted focus:border-primary rounded-full shadow-sm focus:shadow-lg transition-all"
+                data-testid="input-search-main"
+              />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-6 h-6 text-muted-foreground" />
+              <Button 
+                type="submit"
+                size="sm"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full px-6 bg-primary hover:bg-primary/90"
+                data-testid="button-search-main"
+              >
+                Найти
+              </Button>
+            </form>
+          </div>
+        </section>
+
         {/* Collections Section */}
         {collections.length > 0 ? (
           <section className="mb-8">
