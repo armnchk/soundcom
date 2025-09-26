@@ -590,6 +590,9 @@ function YandexMusicImportTab() {
 
       {/* Background Import Jobs */}
       <BackgroundImportSection />
+
+      {/* Automatic Scheduler Management */}
+      <AutomaticSchedulerSection />
     </div>
   );
 }
@@ -844,9 +847,6 @@ function BackgroundImportSection() {
         </Alert>
       </CardContent>
     </Card>
-
-    {/* Automatic Scheduler Management */}
-    <AutomaticSchedulerSection />
   );
 }
 
