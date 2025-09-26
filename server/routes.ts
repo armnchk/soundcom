@@ -12,7 +12,9 @@ import {
   insertCommentReactionSchema,
   insertReportSchema,
   insertCollectionSchema,
-  insertCollectionReleaseSchema
+  insertCollectionReleaseSchema,
+  insertAutoImportPlaylistSchema,
+  autoImportPlaylists
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -1054,6 +1056,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error triggering manual import:", error);
       res.status(500).json({ message: "Failed to trigger manual import" });
+    }
+  });
+
+  // Auto Import Playlists management (Admin only)
+  app.get('/api/admin/auto-playlists', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const playlists = await storage.getAutoImportPlaylists();
+      res.json(playlists);
+    } catch (error) {
+      console.error("Error fetching auto playlists:", error);
+      res.status(500).json({ message: "Failed to fetch playlists" });
+    }
+  });
+
+  app.post('/api/admin/auto-playlists', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const validated = insertAutoImportPlaylistSchema.parse(req.body);
+      const playlist = await storage.createAutoImportPlaylist(validated);
+      res.json(playlist);
+    } catch (error) {
+      console.error("Error creating auto playlist:", error);
+      res.status(500).json({ message: "Failed to create playlist" });
+    }
+  });
+
+  app.put('/api/admin/auto-playlists/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      const validated = insertAutoImportPlaylistSchema.partial().parse(req.body);
+      const playlist = await storage.updateAutoImportPlaylist(id, validated);
+      res.json(playlist);
+    } catch (error) {
+      console.error("Error updating auto playlist:", error);
+      res.status(500).json({ message: "Failed to update playlist" });
+    }
+  });
+
+  app.delete('/api/admin/auto-playlists/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const id = parseInt(req.params.id);
+      await storage.deleteAutoImportPlaylist(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting auto playlist:", error);
+      res.status(500).json({ message: "Failed to delete playlist" });
     }
   });
 

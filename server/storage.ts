@@ -8,6 +8,7 @@ import {
   reports,
   collections,
   collectionReleases,
+  autoImportPlaylists,
   type User,
   type UpsertUser,
   type Artist,
@@ -18,6 +19,7 @@ import {
   type Report,
   type Collection,
   type CollectionRelease,
+  type SelectAutoImportPlaylist,
   type InsertArtist,
   type InsertRelease,
   type InsertRating,
@@ -26,6 +28,7 @@ import {
   type InsertReport,
   type InsertCollection,
   type InsertCollectionRelease,
+  type InsertAutoImportPlaylist,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, sql, and, or, ilike } from "drizzle-orm";
@@ -98,6 +101,11 @@ export interface IStorage {
     recentReleases: number;
   }>;
   
+  // Auto Import Playlists operations
+  getAutoImportPlaylists(): Promise<SelectAutoImportPlaylist[]>;
+  createAutoImportPlaylist(playlist: InsertAutoImportPlaylist): Promise<SelectAutoImportPlaylist>;
+  updateAutoImportPlaylist(id: number, playlist: Partial<InsertAutoImportPlaylist>): Promise<SelectAutoImportPlaylist>;
+  deleteAutoImportPlaylist(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -717,6 +725,29 @@ export class DatabaseStorage implements IStorage {
       artistsWithSpotify: artistsWithSpotifyResult.count,
       recentReleases: recentReleasesResult.count
     };
+  }
+
+  // Auto Import Playlists operations
+  async getAutoImportPlaylists(): Promise<SelectAutoImportPlaylist[]> {
+    return await db.select().from(autoImportPlaylists).orderBy(autoImportPlaylists.sortOrder, autoImportPlaylists.createdAt);
+  }
+
+  async createAutoImportPlaylist(playlist: InsertAutoImportPlaylist): Promise<SelectAutoImportPlaylist> {
+    const [created] = await db.insert(autoImportPlaylists).values(playlist).returning();
+    return created;
+  }
+
+  async updateAutoImportPlaylist(id: number, playlist: Partial<InsertAutoImportPlaylist>): Promise<SelectAutoImportPlaylist> {
+    const [updated] = await db
+      .update(autoImportPlaylists)
+      .set({ ...playlist, updatedAt: new Date() })
+      .where(eq(autoImportPlaylists.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteAutoImportPlaylist(id: number): Promise<void> {
+    await db.delete(autoImportPlaylists).where(eq(autoImportPlaylists.id, id));
   }
 
 }
