@@ -1,4 +1,5 @@
 import { importFromYandexPlaylist, updateAllArtists } from './music-importer';
+import * as cron from 'node-cron';
 
 // Список плейлистов Яндекс Музыки для автоматического импорта
 const YANDEX_PLAYLISTS = [
@@ -84,31 +85,94 @@ export async function runDailyMusicImport() {
   return totalStats;
 }
 
-// Запуск в 03:00 каждый день (если нужно настроить cron)
+// Переменная для хранения активной задачи cron
+let scheduledTask: cron.ScheduledTask | null = null;
+
+// Запуск в 03:00 каждый день
 export function scheduleDaily() {
-  console.log('⏰ Планировщик настроен для ежедневного импорта в 03:00');
+  console.log('⏰ Настройка автоматического планировщика для ежедневного импорта в 03:00');
   
-  // В производственной среде здесь был бы реальный cron или setTimeout
-  // Для демонстрации покажем как это будет работать
+  // Если уже есть запланированная задача, остановим её
+  if (scheduledTask) {
+    scheduledTask.stop();
+    console.log('🛑 Предыдущая задача остановлена');
+  }
+  
+  // Запланируем новую задачу на каждый день в 03:00
+  scheduledTask = cron.schedule('0 3 * * *', async () => {
+    console.log('🌅 Автоматический запуск ежедневного импорта музыки...');
+    
+    try {
+      const stats = await runDailyMusicImport();
+      console.log('✅ Автоматический импорт завершен успешно');
+      console.log(`📊 Итого: +${stats.newReleases} релизов, +${stats.newArtists} артистов, ${stats.errors.length} ошибок`);
+    } catch (error) {
+      console.error('❌ Ошибка автоматического импорта:', error);
+    }
+  }, {
+    timezone: "Europe/Moscow" // Московское время
+  });
   
   const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(3, 0, 0, 0); // 03:00
+  const nextRun = new Date();
   
-  const msUntilNextRun = tomorrow.getTime() - now.getTime();
+  // Если сейчас уже после 03:00, то следующий запуск завтра
+  if (now.getHours() >= 3) {
+    nextRun.setDate(nextRun.getDate() + 1);
+  }
+  nextRun.setHours(3, 0, 0, 0);
+  
+  const msUntilNextRun = nextRun.getTime() - now.getTime();
   const hoursUntilNextRun = Math.round(msUntilNextRun / (1000 * 60 * 60));
   
-  console.log(`⏳ Следующий автоматический импорт через ${hoursUntilNextRun} часов`);
-  
-  // В реальной системе здесь был бы:
-  // setTimeout(runDailyMusicImport, msUntilNextRun);
-  // или использование библиотеки node-cron:
-  // cron.schedule('0 3 * * *', runDailyMusicImport);
+  console.log(`⏳ Следующий автоматический импорт через ${hoursUntilNextRun} часов (${nextRun.toLocaleString('ru')})`);
+  console.log('🚀 Автоматический планировщик активен!');
   
   return {
-    nextRun: tomorrow,
-    hoursUntilNextRun
+    nextRun,
+    hoursUntilNextRun,
+    isActive: true
+  };
+}
+
+// Остановка автоматического планировщика
+export function stopScheduler() {
+  if (scheduledTask) {
+    scheduledTask.stop();
+    scheduledTask = null;
+    console.log('🛑 Автоматический планировщик остановлен');
+    return true;
+  }
+  return false;
+}
+
+// Получение статуса планировщика
+export function getSchedulerStatus() {
+  const isActive = scheduledTask ? scheduledTask.getStatus() === 'scheduled' : false;
+  
+  if (isActive) {
+    const now = new Date();
+    const nextRun = new Date();
+    
+    if (now.getHours() >= 3) {
+      nextRun.setDate(nextRun.getDate() + 1);
+    }
+    nextRun.setHours(3, 0, 0, 0);
+    
+    const msUntilNextRun = nextRun.getTime() - now.getTime();
+    const hoursUntilNextRun = Math.round(msUntilNextRun / (1000 * 60 * 60));
+    
+    return {
+      isActive: true,
+      nextRun,
+      hoursUntilNextRun
+    };
+  }
+  
+  return {
+    isActive: false,
+    nextRun: null,
+    hoursUntilNextRun: null
   };
 }
 

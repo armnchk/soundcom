@@ -844,6 +844,223 @@ function BackgroundImportSection() {
         </Alert>
       </CardContent>
     </Card>
+
+    {/* Automatic Scheduler Management */}
+    <AutomaticSchedulerSection />
+  );
+}
+
+// Automatic Scheduler Management Component
+function AutomaticSchedulerSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Fetch scheduler status
+  const { data: schedulerStatus, isLoading: statusLoading } = useQuery({
+    queryKey: ["/api/scheduler/status"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/scheduler/status');
+      return response.json();
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Start scheduler
+  const startScheduler = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/scheduler/start', {});
+      return response.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Планировщик запущен!",
+        description: result.message,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduler/status"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка запуска",
+        description: error.message || "Не удалось запустить планировщик",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Stop scheduler
+  const stopScheduler = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/scheduler/stop', {});
+      return response.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Планировщик остановлен",
+        description: result.message,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/scheduler/status"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка остановки",
+        description: error.message || "Не удалось остановить планировщик",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Trigger manual import
+  const triggerImport = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/scheduler/trigger', {});
+      return response.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Импорт запущен",
+        description: result.message,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка запуска",
+        description: error.message || "Не удалось запустить импорт",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const getStatusColor = (isActive: boolean) => {
+    return isActive ? 'text-green-500' : 'text-red-500';
+  };
+
+  const getStatusText = (isActive: boolean) => {
+    return isActive ? 'Активен' : 'Остановлен';
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Calendar className="w-6 h-6 text-primary" />
+          <div>
+            <h3 className="text-xl font-semibold text-white">Автоматический ежедневный импорт</h3>
+            <p className="text-white/70 text-sm">
+              Система автоматически обновляет базу каждый день в 03:00 МСК
+            </p>
+          </div>
+        </div>
+
+        {statusLoading ? (
+          <div className="text-center py-4">
+            <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-white/70 mt-2">Загрузка статуса...</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Current Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-muted/20 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white font-medium">Статус планировщика</span>
+                  <span className={`text-sm font-bold ${getStatusColor(schedulerStatus?.isActive)}`}>
+                    {getStatusText(schedulerStatus?.isActive)}
+                  </span>
+                </div>
+                {schedulerStatus?.isActive && schedulerStatus?.nextRun && (
+                  <div className="text-sm text-white/70">
+                    Следующий запуск: {new Date(schedulerStatus.nextRun).toLocaleString('ru')}
+                    <br />
+                    Через: {schedulerStatus.hoursUntilNextRun} часов
+                  </div>
+                )}
+              </div>
+
+              <div className="bg-muted/20 rounded-lg p-4">
+                <div className="text-white font-medium mb-2">Автоматически обрабатывает</div>
+                <div className="text-sm text-white/70">
+                  • MTS Music Чарт<br />
+                  • Яндекс Музыка плейлисты<br />
+                  • Обновление всех артистов<br />
+                  • Поиск новых релизов
+                </div>
+              </div>
+            </div>
+
+            {/* Control Buttons */}
+            <div className="flex gap-3">
+              {schedulerStatus?.isActive ? (
+                <Button
+                  onClick={() => stopScheduler.mutate()}
+                  disabled={stopScheduler.isPending}
+                  variant="destructive"
+                  data-testid="button-stop-scheduler"
+                >
+                  {stopScheduler.isPending ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Остановка...
+                    </div>
+                  ) : (
+                    <>
+                      <X className="w-4 h-4 mr-2" />
+                      Остановить планировщик
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => startScheduler.mutate()}
+                  disabled={startScheduler.isPending}
+                  data-testid="button-start-scheduler"
+                >
+                  {startScheduler.isPending ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Запуск...
+                    </div>
+                  ) : (
+                    <>
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Запустить планировщик
+                    </>
+                  )}
+                </Button>
+              )}
+
+              <Button
+                onClick={() => triggerImport.mutate()}
+                disabled={triggerImport.isPending}
+                variant="secondary"
+                data-testid="button-trigger-import"
+              >
+                {triggerImport.isPending ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Запуск...
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4 mr-2" />
+                    Запустить сейчас
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Info Alert */}
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription className="text-white/80">
+                <strong>Автоматический импорт:</strong> Планировщик запускается автоматически при старте сервера.
+                Каждый день в 03:00 МСК система будет обновлять базу новыми релизами из русских музыкальных сервисов.
+                Можете также запустить импорт вручную в любое время.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

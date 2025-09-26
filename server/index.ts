@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { scheduleDaily } from "./scheduler";
 
 const app = express();
 app.use(express.json());
@@ -67,5 +68,14 @@ app.use((req, res, next) => {
     reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
+    
+    // Запускаем автоматический планировщик музыкального импорта
+    try {
+      const schedulerInfo = scheduleDaily();
+      log(`🎵 Автоматический музыкальный импорт активирован`);
+      log(`⏰ Следующий запуск через ${schedulerInfo.hoursUntilNextRun} часов`);
+    } catch (error) {
+      log(`❌ Ошибка запуска планировщика: ${error}`);
+    }
   });
 })();

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { massImportService } from "./music-import";
+import { scheduleDaily, stopScheduler, getSchedulerStatus, runDailyMusicImport } from "./scheduler";
 import { 
   insertArtistSchema, 
   insertReleaseSchema, 
@@ -963,6 +964,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting import stats:", error);
       res.status(500).json({ message: "Failed to fetch import stats" });
+    }
+  });
+
+  // Automatic Scheduler Management Endpoints
+  
+  // Get scheduler status
+  app.get('/api/scheduler/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const status = getSchedulerStatus();
+      res.json(status);
+    } catch (error) {
+      console.error("Error getting scheduler status:", error);
+      res.status(500).json({ message: "Failed to get scheduler status" });
+    }
+  });
+
+  // Start automatic scheduler
+  app.post('/api/scheduler/start', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const schedulerInfo = scheduleDaily();
+      res.json({
+        success: true,
+        message: "Автоматический планировщик запущен",
+        ...schedulerInfo
+      });
+    } catch (error) {
+      console.error("Error starting scheduler:", error);
+      res.status(500).json({ message: "Failed to start scheduler" });
+    }
+  });
+
+  // Stop automatic scheduler
+  app.post('/api/scheduler/stop', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const stopped = stopScheduler();
+      res.json({
+        success: stopped,
+        message: stopped ? "Автоматический планировщик остановлен" : "Планировщик уже был остановлен"
+      });
+    } catch (error) {
+      console.error("Error stopping scheduler:", error);
+      res.status(500).json({ message: "Failed to stop scheduler" });
+    }
+  });
+
+  // Manually trigger daily import
+  app.post('/api/scheduler/trigger', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      // Run in background to avoid timeout
+      runDailyMusicImport().then(stats => {
+        console.log('📊 Ручной импорт завершен:', stats);
+      }).catch(error => {
+        console.error('❌ Ошибка ручного импорта:', error);
+      });
+
+      res.json({
+        success: true,
+        message: "Ежедневный импорт запущен в фоне. Проверьте логи сервера для отслеживания прогресса."
+      });
+    } catch (error) {
+      console.error("Error triggering manual import:", error);
+      res.status(500).json({ message: "Failed to trigger manual import" });
     }
   });
 
