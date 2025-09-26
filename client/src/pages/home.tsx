@@ -137,15 +137,15 @@ export default function Home() {
 
                   {/* Collection Releases - Horizontal Scroll */}
                   <div className="relative">
-                    <div className="flex space-x-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: 'thin' }}>
-                      {collection.releases.slice(0, 7).map((release) => (
+                    <div className="flex space-x-6 overflow-x-auto pb-4 scroll-smooth" style={{ scrollbarWidth: 'thin' }}>
+                      {collection.releases.slice(0, 5).map((release) => (
                         <div
                           key={release.id}
-                          className="flex-none w-40 cursor-pointer group"
+                          className="flex-none w-52 cursor-pointer group"
                           onClick={() => handleReleaseClick(release.id)}
                           data-testid={`collection-release-${collection.id}-${release.id}`}
                         >
-                          <div className="w-40 h-40 rounded-lg overflow-hidden mb-3 bg-muted">
+                          <div className="w-52 h-52 rounded-xl overflow-hidden mb-4 bg-muted shadow-lg group-hover:shadow-xl transition-all duration-300">
                             {release.coverUrl ? (
                               <img 
                                 src={release.coverUrl} 
@@ -158,14 +158,14 @@ export default function Home() {
                               </div>
                             )}
                           </div>
-                          <h4 className="font-medium text-base text-foreground truncate" title={release.title}>
+                          <h4 className="font-semibold text-lg text-foreground truncate" title={release.title}>
                             {release.title}
                           </h4>
-                          <p className="text-sm text-muted-foreground truncate" title={release.artist.name}>
+                          <p className="text-base text-muted-foreground truncate" title={release.artist.name}>
                             {release.artist.name}
                           </p>
-                          <div className="flex items-center mt-2">
-                            <span className="text-sm font-medium text-primary">
+                          <div className="flex items-center mt-3">
+                            <span className="text-base font-semibold text-primary">
                               {release.averageRating && Number(release.averageRating) > 0 
                                 ? Number(release.averageRating).toFixed(1) 
                                 : '—'
@@ -175,12 +175,12 @@ export default function Home() {
                         </div>
                       ))}
                       
-                      {collection.releases.length > 7 && (
-                        <div className="flex-none w-40 flex items-center justify-center">
+                      {collection.releases.length > 5 && (
+                        <div className="flex-none w-52 flex items-center justify-center">
                           <div className="text-center text-muted-foreground">
-                            <ArrowRight className="w-6 h-6 mx-auto mb-2" />
-                            <p className="text-sm">
-                              +{collection.releases.length - 7} more
+                            <ArrowRight className="w-8 h-8 mx-auto mb-3" />
+                            <p className="text-base font-medium">
+                              +{collection.releases.length - 5} more
                             </p>
                           </div>
                         </div>
