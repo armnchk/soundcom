@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Music, FolderOpen, ArrowRight, Search } from "lucide-react";
@@ -122,101 +121,80 @@ export default function Home() {
         {/* Collections Section */}
         {collections.length > 0 ? (
           <section className="mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-foreground flex items-center">
-                <FolderOpen className="mr-3 text-primary" />
-                Подборки
-              </h2>
-            </div>
-            
-            <div className="space-y-8">
+            <div className="space-y-12">
               {collections.map((collection) => (
-                <Card key={collection.id} className="overflow-hidden">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div>
-                        <h3 className="text-xl font-bold text-foreground mb-1">
-                          {collection.title}
-                        </h3>
-                        {collection.subtitle && (
-                          <p className="text-muted-foreground text-sm mb-2">
-                            {collection.subtitle}
-                          </p>
-                        )}
-                        {collection.description && (
-                          <p className="text-muted-foreground text-sm">
-                            {collection.description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">
-                          {collection.releases.length} releases
-                        </p>
-                      </div>
-                    </div>
+                <div key={collection.id}>
+                  <div className="mb-6">
+                    <h2 className="text-3xl font-bold text-foreground mb-2">
+                      {collection.title}
+                    </h2>
+                    {(collection.subtitle || collection.description) && (
+                      <p className="text-muted-foreground text-lg">
+                        {collection.subtitle || collection.description}
+                      </p>
+                    )}
+                  </div>
 
-                    {/* Collection Releases - Horizontal Scroll */}
-                    <div className="relative">
-                      <div className="flex space-x-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: 'thin' }}>
-                        {collection.releases.slice(0, 10).map((release) => (
-                          <div
-                            key={release.id}
-                            className="flex-none w-32 cursor-pointer group"
-                            onClick={() => handleReleaseClick(release.id)}
-                            data-testid={`collection-release-${collection.id}-${release.id}`}
-                          >
-                            <div className="w-32 h-32 rounded-lg overflow-hidden mb-2 bg-muted">
-                              {release.coverUrl ? (
-                                <img 
-                                  src={release.coverUrl} 
-                                  alt={`${release.title} cover`}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                                />
-                              ) : (
-                                <div className="w-full h-full bg-muted flex items-center justify-center">
-                                  <Music className="w-8 h-8 text-muted-foreground" />
-                                </div>
-                              )}
-                            </div>
-                            <h4 className="font-medium text-sm text-foreground truncate" title={release.title}>
-                              {release.title}
-                            </h4>
-                            <p className="text-xs text-muted-foreground truncate" title={release.artist.name}>
-                              {release.artist.name}
+                  {/* Collection Releases - Horizontal Scroll */}
+                  <div className="relative">
+                    <div className="flex space-x-4 overflow-x-auto pb-2 scroll-smooth" style={{ scrollbarWidth: 'thin' }}>
+                      {collection.releases.slice(0, 10).map((release) => (
+                        <div
+                          key={release.id}
+                          className="flex-none w-32 cursor-pointer group"
+                          onClick={() => handleReleaseClick(release.id)}
+                          data-testid={`collection-release-${collection.id}-${release.id}`}
+                        >
+                          <div className="w-32 h-32 rounded-lg overflow-hidden mb-2 bg-muted">
+                            {release.coverUrl ? (
+                              <img 
+                                src={release.coverUrl} 
+                                alt={`${release.title} cover`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-muted flex items-center justify-center">
+                                <Music className="w-8 h-8 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                          <h4 className="font-medium text-sm text-foreground truncate" title={release.title}>
+                            {release.title}
+                          </h4>
+                          <p className="text-xs text-muted-foreground truncate" title={release.artist.name}>
+                            {release.artist.name}
+                          </p>
+                          <div className="flex items-center mt-1">
+                            <span className="text-xs font-medium text-primary">
+                              {release.averageRating && Number(release.averageRating) > 0 
+                                ? Number(release.averageRating).toFixed(1) 
+                                : '—'
+                              }
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {collection.releases.length > 10 && (
+                        <div className="flex-none w-32 flex items-center justify-center">
+                          <div className="text-center text-muted-foreground">
+                            <ArrowRight className="w-6 h-6 mx-auto mb-2" />
+                            <p className="text-xs">
+                              +{collection.releases.length - 10} more
                             </p>
-                            <div className="flex items-center mt-1">
-                              <span className="text-xs font-medium text-primary">
-                                {release.averageRating && Number(release.averageRating) > 0 
-                                  ? Number(release.averageRating).toFixed(1) 
-                                  : '—'
-                                }
-                              </span>
-                            </div>
                           </div>
-                        ))}
-                        
-                        {collection.releases.length > 10 && (
-                          <div className="flex-none w-32 flex items-center justify-center">
-                            <div className="text-center text-muted-foreground">
-                              <ArrowRight className="w-6 h-6 mx-auto mb-2" />
-                              <p className="text-xs">
-                                +{collection.releases.length - 10} more
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               ))}
             </div>
           </section>
         ) : (
           <div className="text-center py-12">
             <FolderOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Подборки будут показаны здесь после их создания в админке.</p>
+            <p className="text-muted-foreground">Контент будет показан здесь после создания подборок в админке.</p>
           </div>
         )}
       </main>
