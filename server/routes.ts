@@ -491,6 +491,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Yandex Music Import Stats
+  app.get('/api/import/stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const stats = await storage.getImportStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting import stats:", error);
+      res.status(500).json({ message: "Failed to get import stats" });
+    }
+  });
+
+  // Test Yandex Music Playlist Import
+  app.post('/api/import/test-playlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const { playlistUrl } = req.body;
+      if (!playlistUrl || typeof playlistUrl !== 'string') {
+        return res.status(400).json({ message: "Playlist URL is required" });
+      }
+
+      if (!playlistUrl.includes('music.yandex.ru')) {
+        return res.status(400).json({ message: "Invalid Yandex Music URL" });
+      }
+
+      // Import from playlist using the music importer
+      const musicImporter = await import('./music-importer');
+      const result = await musicImporter.importFromYandexPlaylist(playlistUrl);
+      
+      res.json({
+        success: true,
+        stats: result
+      });
+    } catch (error) {
+      console.error("Error testing playlist import:", error);
+      res.status(500).json({ message: error.message || "Failed to import playlist" });
+    }
+  });
+
+  // Update existing artists with new releases
+  app.post('/api/import/update-artists', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      // Update all artists with Spotify IDs
+      const musicImporter = await import('./music-importer');
+      const result = await musicImporter.updateAllArtists();
+      
+      res.json({
+        success: true,
+        stats: result
+      });
+    } catch (error) {
+      console.error("Error updating artists:", error);
+      res.status(500).json({ message: error.message || "Failed to update artists" });
+    }
+  });
+
   // User profile routes
   app.get('/api/users/:id/ratings', async (req, res) => {
     try {

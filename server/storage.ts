@@ -90,6 +90,14 @@ export interface IStorage {
   removeReleaseFromCollection(collectionId: number, releaseId: number): Promise<void>;
   updateCollectionReleaseSortOrder(collectionId: number, releaseId: number, sortOrder: number): Promise<void>;
   
+  // Import statistics operations
+  getImportStats(): Promise<{
+    totalArtists: number;
+    totalReleases: number;
+    artistsWithSpotify: number;
+    recentReleases: number;
+  }>;
+  
 }
 
 export class DatabaseStorage implements IStorage {
@@ -671,6 +679,44 @@ export class DatabaseStorage implements IStorage {
         eq(collectionReleases.collectionId, collectionId),
         eq(collectionReleases.releaseId, releaseId)
       ));
+  }
+
+  async getImportStats(): Promise<{
+    totalArtists: number;
+    totalReleases: number;
+    artistsWithSpotify: number;
+    recentReleases: number;
+  }> {
+    // Get total counts
+    const [totalArtistsResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(artists);
+    
+    const [totalReleasesResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(releases);
+    
+    // Get artists with Spotify IDs
+    const [artistsWithSpotifyResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(artists)
+      .where(sql`spotify_id IS NOT NULL AND spotify_id != ''`);
+    
+    // Get releases from the past week
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    const [recentReleasesResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(releases)
+      .where(sql`created_at > ${oneWeekAgo}`);
+    
+    return {
+      totalArtists: totalArtistsResult.count,
+      totalReleases: totalReleasesResult.count,
+      artistsWithSpotify: artistsWithSpotifyResult.count,
+      recentReleases: recentReleasesResult.count
+    };
   }
 
 }
