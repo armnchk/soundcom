@@ -587,7 +587,263 @@ function YandexMusicImportTab() {
           </Alert>
         </CardContent>
       </Card>
+
+      {/* Background Import Jobs */}
+      <BackgroundImportSection />
     </div>
+  );
+}
+
+// Background Import Jobs Component
+function BackgroundImportSection() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [backgroundUrl, setBackgroundUrl] = useState('');
+
+  // Fetch background jobs
+  const { data: jobs = [], isLoading: jobsLoading } = useQuery({
+    queryKey: ["/api/import/jobs"],
+    queryFn: async () => {
+      const response = await apiRequest('GET', '/api/import/jobs');
+      return response.json();
+    },
+    refetchInterval: 2000, // Refresh every 2 seconds for real-time updates
+  });
+
+  // Start background import
+  const startBackgroundImport = useMutation({
+    mutationFn: async (url: string) => {
+      const response = await apiRequest('POST', '/api/import/background-playlist', { playlistUrl: url });
+      return response.json();
+    },
+    onSuccess: (result) => {
+      toast({
+        title: "Фоновый импорт запущен!",
+        description: `Задача #${result.jobId} создана. Отслеживайте прогресс ниже.`,
+      });
+      setBackgroundUrl('');
+      queryClient.invalidateQueries({ queryKey: ["/api/import/jobs"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка запуска",
+        description: error.message || "Не удалось запустить фоновый импорт",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Cancel background job
+  const cancelJob = useMutation({
+    mutationFn: async (jobId: number) => {
+      const response = await apiRequest('POST', `/api/import/jobs/${jobId}/cancel`, {});
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Задача отменена",
+        description: "Фоновый импорт был отменён",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/import/jobs"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка отмены",
+        description: error.message || "Не удалось отменить задачу",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleStartBackgroundImport = () => {
+    if (!backgroundUrl.trim()) {
+      toast({
+        title: "Ошибка",
+        description: "Пожалуйста, введите URL плейлиста",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!backgroundUrl.includes('music.mts.ru') && !backgroundUrl.includes('music.yandex.ru')) {
+      toast({
+        title: "Ошибка",
+        description: "Пожалуйста, введите корректную ссылку на плейлист (MTS Music или Яндекс Музыка)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    startBackgroundImport.mutate(backgroundUrl);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'text-yellow-500';
+      case 'processing': return 'text-blue-500';
+      case 'completed': return 'text-green-500';
+      case 'failed': return 'text-red-500';
+      default: return 'text-gray-500';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Ожидание';
+      case 'processing': return 'Выполняется';
+      case 'completed': return 'Завершен';
+      case 'failed': return 'Ошибка';
+      default: return status;
+    }
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Database className="w-6 h-6 text-primary" />
+          <div>
+            <h3 className="text-xl font-semibold text-white">Фоновый импорт (для массовой обработки)</h3>
+            <p className="text-white/70 text-sm">
+              Запуск длительного импорта в фоне для обработки больших плейлистов без таймаутов
+            </p>
+          </div>
+        </div>
+
+        {/* Background Import Form */}
+        <div className="space-y-4 mb-6">
+          <div>
+            <Label htmlFor="background-url" className="text-white">URL плейлиста для фонового импорта</Label>
+            <div className="flex gap-2 mt-1">
+              <Input
+                id="background-url"
+                placeholder="https://music.mts.ru/chart или https://music.yandex.ru/playlists/..."
+                value={backgroundUrl}
+                onChange={(e) => setBackgroundUrl(e.target.value)}
+                className="text-white"
+                data-testid="input-background-url"
+              />
+              <Button
+                onClick={handleStartBackgroundImport}
+                disabled={startBackgroundImport.isPending}
+                data-testid="button-start-background"
+              >
+                {startBackgroundImport.isPending ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    Запуск...
+                  </div>
+                ) : (
+                  <>
+                    <Database className="w-4 h-4 mr-2" />
+                    Запустить в фоне
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Jobs List */}
+        <div>
+          <h4 className="text-lg font-semibold text-white mb-4">Фоновые задачи</h4>
+          
+          {jobsLoading ? (
+            <div className="text-center py-4">
+              <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-white/70 mt-2">Загрузка задач...</p>
+            </div>
+          ) : jobs.length === 0 ? (
+            <div className="text-center py-8 text-white/70">
+              Нет фоновых задач
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {jobs.map((job: any) => (
+                <div key={job.id} className="border border-white/20 rounded-lg p-4 bg-muted/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <span className="font-medium text-white">Задача #{job.id}</span>
+                      <span className={`text-sm font-medium ${getStatusColor(job.status)}`}>
+                        {getStatusText(job.status)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {job.status === 'processing' && (
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => cancelJob.mutate(job.id)}
+                          disabled={cancelJob.isPending}
+                        >
+                          Отменить
+                        </Button>
+                      )}
+                      <span className="text-xs text-white/60">
+                        {new Date(job.createdAt).toLocaleString('ru')}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="text-sm text-white/80 mb-3">
+                    <div className="break-all">{job.playlistUrl}</div>
+                  </div>
+
+                  {/* Progress Bar */}
+                  {job.status === 'processing' && (
+                    <div className="mb-3">
+                      <div className="flex justify-between text-xs text-white/70 mb-1">
+                        <span>Прогресс: {job.progress || 0}%</span>
+                        <span>{job.processedArtists || 0}/{job.totalArtists || 0} артистов</span>
+                      </div>
+                      <div className="w-full bg-white/20 rounded-full h-2">
+                        <div 
+                          className="bg-primary h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${job.progress || 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Results */}
+                  {(job.status === 'completed' || job.status === 'processing') && (
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="text-center">
+                        <div className="font-medium text-green-400">{job.newReleases || 0}</div>
+                        <div className="text-white/60">Новых</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-medium text-yellow-400">{job.skippedReleases || 0}</div>
+                        <div className="text-white/60">Пропущено</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-medium text-red-400">{job.errors || 0}</div>
+                        <div className="text-white/60">Ошибок</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error Message */}
+                  {job.status === 'failed' && job.errorMessage && (
+                    <div className="mt-2 p-2 bg-red-900/20 border border-red-500/30 rounded text-red-400 text-sm">
+                      {job.errorMessage}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Alert className="mt-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="text-white/80">
+            <strong>Фоновый импорт:</strong> Обрабатывает плейлисты любого размера без таймаутов. 
+            Идеально для больших плейлистов с сотнями артистов. Следите за прогрессом в режиме реального времени.
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
   );
 }
 
