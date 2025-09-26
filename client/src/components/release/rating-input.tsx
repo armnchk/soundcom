@@ -32,6 +32,7 @@ export function RatingInput({
           return (
             <button
               key={index}
+              type="button"
               className={cn(
                 "w-8 h-8 rounded-md text-sm font-medium transition-colors border",
                 isSelected 
