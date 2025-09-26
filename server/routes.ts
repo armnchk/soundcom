@@ -1142,6 +1142,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import Logs endpoints
+  app.get('/api/import-logs', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+      const logs = await storage.getImportLogs(limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching import logs:", error);
+      res.status(500).json({ message: "Failed to fetch import logs" });
+    }
+  });
+
+  app.get('/api/import-logs/latest', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const latestLog = await storage.getLatestImportLog();
+      res.json(latestLog || null);
+    } catch (error) {
+      console.error("Error fetching latest import log:", error);
+      res.status(500).json({ message: "Failed to fetch latest import log" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
