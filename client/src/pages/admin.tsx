@@ -1823,7 +1823,7 @@ function PlaylistsTab() {
                 </Label>
                 <Input
                   id="playlist-url"
-                  type="url"
+                  type="text"
                   value={playlistForm.url}
                   onChange={(e) => setPlaylistForm({ ...playlistForm, url: e.target.value })}
                   placeholder="https://music.mts.ru/playlist/..."
