@@ -87,10 +87,10 @@ export default function Home() {
         {/* Search Section */}
         <section className="mb-12">
           <div className="text-center mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-4" data-testid="text-hero-title">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-4" data-testid="text-hero-title">
               Найди свою музыку
             </h1>
-            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto" data-testid="text-hero-description">
+            <p className="text-lg text-white/80 mb-8 max-w-2xl mx-auto" data-testid="text-hero-description">
               Ищи релизы, исполнителей, читай отзывы и ставь оценки
             </p>
           </div>
@@ -102,7 +102,7 @@ export default function Home() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Поиск релизов, исполнителей..."
-                className="w-full pl-12 pr-24 py-6 text-lg bg-background border-2 border-muted focus:border-primary rounded-full shadow-sm focus:shadow-lg transition-all"
+                className="w-full pl-12 pr-24 py-6 text-lg text-white bg-background border-2 border-muted focus:border-primary rounded-full shadow-sm focus:shadow-lg transition-all"
                 data-testid="input-search-main"
               />
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-6 h-6 text-muted-foreground" />
@@ -125,11 +125,11 @@ export default function Home() {
               {collections.map((collection) => (
                 <div key={collection.id}>
                   <div className="mb-6">
-                    <h2 className="text-3xl font-bold text-foreground mb-2">
+                    <h2 className="text-3xl font-bold text-white mb-2">
                       {collection.title}
                     </h2>
                     {(collection.subtitle || collection.description) && (
-                      <p className="text-muted-foreground text-lg">
+                      <p className="text-white/70 text-lg">
                         {collection.subtitle || collection.description}
                       </p>
                     )}
@@ -158,10 +158,10 @@ export default function Home() {
                               </div>
                             )}
                           </div>
-                          <h4 className="font-semibold text-lg text-foreground truncate" title={release.title}>
+                          <h4 className="font-semibold text-lg text-white truncate" title={release.title}>
                             {release.title}
                           </h4>
-                          <p className="text-base text-muted-foreground truncate" title={release.artist.name}>
+                          <p className="text-base text-white/70 truncate" title={release.artist.name}>
                             {release.artist.name}
                           </p>
                           <div className="flex items-center mt-3">
@@ -194,7 +194,7 @@ export default function Home() {
         ) : (
           <div className="text-center py-12">
             <FolderOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">Контент будет показан здесь после создания подборок в админке.</p>
+            <p className="text-white/70">Контент будет показан здесь после создания подборок в админке.</p>
           </div>
         )}
       </main>

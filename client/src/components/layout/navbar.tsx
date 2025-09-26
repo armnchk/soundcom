@@ -50,7 +50,7 @@ export default function Navbar() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Поиск релизов, исполнителей..."
-                  className="pl-10 bg-input border-border focus:ring-2 focus:ring-ring"
+                  className="pl-10 bg-input border-border focus:ring-2 focus:ring-ring text-white"
                   data-testid="input-search"
                 />
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -72,7 +72,7 @@ export default function Navbar() {
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="hidden sm:inline text-sm font-medium" data-testid="text-username">
+                    <span className="hidden sm:inline text-sm font-medium text-white" data-testid="text-username">
                       {user?.nickname || user?.firstName || 'User'}
                     </span>
                   </Button>
@@ -116,7 +116,7 @@ export default function Navbar() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Поиск музыки..."
-              className="pl-10 bg-input border-border"
+              className="pl-10 bg-input border-border text-white"
               data-testid="input-search-mobile"
             />
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
