@@ -9,8 +9,11 @@ import { useState } from "react";
 
 export default function Navbar() {
   const { user, isAuthenticated } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Hide search on homepage since it has its own search block
+  const isHomePage = location === "/";
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,20 +41,22 @@ export default function Navbar() {
             <span className="text-xl font-bold text-foreground">RevYou</span>
           </Link>
 
-          {/* Search Bar */}
-          <div className="hidden md:flex flex-1 max-w-md mx-8">
-            <form onSubmit={handleSearch} className="relative w-full">
-              <Input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск релизов, исполнителей..."
-                className="pl-10 bg-input border-border focus:ring-2 focus:ring-ring"
-                data-testid="input-search"
-              />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            </form>
-          </div>
+          {/* Search Bar - Hidden on homepage */}
+          {!isHomePage && (
+            <div className="hidden md:flex flex-1 max-w-md mx-8">
+              <form onSubmit={handleSearch} className="relative w-full">
+                <Input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Поиск релизов, исполнителей..."
+                  className="pl-10 bg-input border-border focus:ring-2 focus:ring-ring"
+                  data-testid="input-search"
+                />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              </form>
+            </div>
+          )}
 
           {/* User Menu */}
           <div className="flex items-center space-x-4">
@@ -102,20 +107,22 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile Search */}
-      <div className="md:hidden px-4 py-3 border-b border-border">
-        <form onSubmit={handleSearch} className="relative">
-          <Input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск музыки..."
-            className="pl-10 bg-input border-border"
-            data-testid="input-search-mobile"
-          />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        </form>
-      </div>
+      {/* Mobile Search - Hidden on homepage */}
+      {!isHomePage && (
+        <div className="md:hidden px-4 py-3 border-b border-border">
+          <form onSubmit={handleSearch} className="relative">
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Поиск музыки..."
+              className="pl-10 bg-input border-border"
+              data-testid="input-search-mobile"
+            />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          </form>
+        </div>
+      )}
     </nav>
   );
 }
