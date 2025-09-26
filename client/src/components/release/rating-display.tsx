@@ -1,4 +1,3 @@
-import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface StarRatingProps {
@@ -27,27 +26,10 @@ export function StarRating({
   const numericRating = Number(rating || 0);
   
   return (
-    <div className={cn("flex items-center gap-1", className)} data-testid="star-rating">
-      {Array.from({ length: displayStars }, (_, index) => {
-        const starNumber = index + 1;
-        const filled = starNumber <= numericRating;
-        
-        return (
-          <Star
-            key={index}
-            className={cn(
-              sizeClasses[size],
-              filled ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"
-            )}
-            data-testid={`star-${starNumber}`}
-          />
-        );
-      })}
-      {showValue && (
-        <span className="text-sm text-muted-foreground ml-1" data-testid="rating-value">
-          {Number(rating || 0).toFixed(1)}
-        </span>
-      )}
+    <div className={cn("flex items-center", className)} data-testid="rating-display">
+      <span className="text-sm font-medium text-primary" data-testid="rating-value">
+        {rating && Number(rating) > 0 ? Number(rating).toFixed(1) : '—'}
+      </span>
     </div>
   );
 }
