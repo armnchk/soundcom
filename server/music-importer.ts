@@ -214,6 +214,79 @@ export async function importFromYandexPlaylist(playlistUrl: string): Promise<Imp
   }
 }
 
+// Update all existing artists with new releases
+export async function updateAllArtists(): Promise<ImportStats> {
+  const stats: ImportStats = {
+    newArtists: 0,
+    updatedArtists: 0,
+    newReleases: 0,
+    skippedReleases: 0,
+    errors: []
+  };
+
+  try {
+    console.log('🔄 Starting update of all existing artists...');
+
+    // Get all artists with Spotify IDs
+    const artistsWithSpotify = await db
+      .select()
+      .from(artists)
+      .where(sql`spotify_id IS NOT NULL AND spotify_id != ''`);
+
+    console.log(`Found ${artistsWithSpotify.length} artists with Spotify IDs`);
+
+    for (const artist of artistsWithSpotify) {
+      try {
+        console.log(`🔄 Updating artist: ${artist.name}`);
+
+        // Get latest discography from Spotify
+        const discography = await getArtistDiscography(artist.spotifyId!);
+        
+        let newReleases = 0;
+        let skippedReleases = 0;
+
+        for (const album of discography) {
+          // Check if release already exists
+          if (await releaseExists(album.id, artist.id, album.name)) {
+            skippedReleases++;
+            continue;
+          }
+
+          // Create new release
+          await createReleaseFromSpotifyAlbum(album, artist.id);
+          newReleases++;
+
+          console.log(`  ✅ Added: "${album.name}" (${album.album_type})`);
+        }
+
+        if (newReleases > 0) {
+          stats.updatedArtists++;
+        }
+
+        stats.newReleases += newReleases;
+        stats.skippedReleases += skippedReleases;
+
+        console.log(`  📊 ${artist.name}: +${newReleases} новых, ~${skippedReleases} пропущено`);
+
+        // Rate limiting between artists
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+      } catch (error) {
+        console.error(`❌ Error updating artist "${artist.name}":`, error);
+        stats.errors.push(`${artist.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    console.log(`✅ Artist update completed. Updated: ${stats.updatedArtists}, New releases: ${stats.newReleases}`);
+    return stats;
+
+  } catch (error) {
+    console.error('Error during artist update:', error);
+    stats.errors.push(`Update failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    return stats;
+  }
+}
+
 // Import music from multiple Yandex playlists
 export async function importFromMultipleYandexPlaylists(playlistUrls: string[]): Promise<ImportStats> {
   const totalStats: ImportStats = {
