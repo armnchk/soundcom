@@ -566,6 +566,119 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Background Import Jobs
+  app.post('/api/import/background-playlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const { playlistUrl } = req.body;
+      if (!playlistUrl || typeof playlistUrl !== 'string') {
+        return res.status(400).json({ message: "Playlist URL is required" });
+      }
+
+      if (!playlistUrl.includes('music.mts.ru') && !playlistUrl.includes('music.yandex.ru')) {
+        return res.status(400).json({ message: "Invalid playlist URL - supported: MTS Music, Yandex Music" });
+      }
+
+      // Create background import job
+      const backgroundJobs = await import('./background-jobs');
+      const jobId = await backgroundJobs.createImportJob({
+        playlistUrl,
+        status: 'pending',
+        createdBy: userId,
+      });
+      
+      res.json({
+        success: true,
+        jobId,
+        message: 'Background import job created. Use /api/import/jobs to check progress.'
+      });
+    } catch (error: any) {
+      console.error("Error creating background import job:", error);
+      res.status(500).json({ message: error.message || "Failed to create background import job" });
+    }
+  });
+
+  app.get('/api/import/jobs', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const backgroundJobs = await import('./background-jobs');
+      const jobs = await backgroundJobs.getAllImportJobs(userId);
+      
+      res.json(jobs);
+    } catch (error: any) {
+      console.error("Error fetching import jobs:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch import jobs" });
+    }
+  });
+
+  app.get('/api/import/jobs/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) {
+        return res.status(400).json({ message: "Invalid job ID" });
+      }
+
+      const backgroundJobs = await import('./background-jobs');
+      const job = await backgroundJobs.getImportJob(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+
+      res.json(job);
+    } catch (error: any) {
+      console.error("Error fetching import job:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch import job" });
+    }
+  });
+
+  app.post('/api/import/jobs/:id/cancel', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) {
+        return res.status(400).json({ message: "Invalid job ID" });
+      }
+
+      const backgroundJobs = await import('./background-jobs');
+      const cancelled = await backgroundJobs.cancelImportJob(jobId);
+      
+      if (!cancelled) {
+        return res.status(404).json({ message: "Job not found or already completed" });
+      }
+
+      res.json({ success: true, message: "Job cancelled" });
+    } catch (error: any) {
+      console.error("Error cancelling import job:", error);
+      res.status(500).json({ message: error.message || "Failed to cancel import job" });
+    }
+  });
+
   // User profile routes
   app.get('/api/users/:id/ratings', async (req, res) => {
     try {

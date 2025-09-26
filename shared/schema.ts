@@ -282,3 +282,29 @@ export type InsertCommentReaction = z.infer<typeof insertCommentReactionSchema>;
 export type InsertReport = z.infer<typeof insertReportSchema>;
 export type InsertCollection = z.infer<typeof insertCollectionSchema>;
 export type InsertCollectionRelease = z.infer<typeof insertCollectionReleaseSchema>;
+
+// Import Jobs schema for background processing
+export const importJobs = pgTable('import_jobs', {
+  id: serial('id').primaryKey(),
+  playlistUrl: text('playlist_url').notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending', 'processing', 'completed', 'failed'
+  progress: integer('progress').default(0), // percentage 0-100
+  totalArtists: integer('total_artists').default(0),
+  processedArtists: integer('processed_artists').default(0),
+  newReleases: integer('new_releases').default(0),
+  skippedReleases: integer('skipped_releases').default(0),
+  errors: integer('errors').default(0),
+  errorMessage: text('error_message'),
+  startedAt: timestamp('started_at'),
+  completedAt: timestamp('completed_at'),
+  createdBy: varchar('created_by').references(() => users.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const insertImportJobSchema = createInsertSchema(importJobs).omit({ 
+  id: true, 
+  createdAt: true 
+});
+
+export type ImportJob = typeof importJobs.$inferSelect;
+export type InsertImportJob = z.infer<typeof insertImportJobSchema>;
