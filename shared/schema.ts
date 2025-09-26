@@ -341,3 +341,27 @@ export const insertAutoImportPlaylistSchema = createInsertSchema(autoImportPlayl
   });
 export type InsertAutoImportPlaylist = z.infer<typeof insertAutoImportPlaylistSchema>;
 export type SelectAutoImportPlaylist = typeof autoImportPlaylists.$inferSelect;
+
+// Import logs для отслеживания результатов автоматического импорта
+export const importLogs = pgTable('import_logs', {
+  id: serial('id').primaryKey(),
+  startedAt: timestamp('started_at').notNull().defaultNow(),
+  completedAt: timestamp('completed_at'),
+  status: varchar('status', { length: 20 }).notNull().default('running'), // 'running', 'completed', 'failed'
+  totalPlaylists: integer('total_playlists').default(0),
+  processedPlaylists: integer('processed_playlists').default(0),
+  totalArtists: integer('total_artists').default(0),
+  newReleases: integer('new_releases').default(0),
+  skippedReleases: integer('skipped_releases').default(0),
+  errors: integer('errors').default(0),
+  playlistResults: jsonb('playlist_results'), // детали по каждому плейлисту
+  errorMessage: text('error_message'),
+  type: varchar('type', { length: 20 }).default('scheduled'), // 'scheduled', 'manual'
+});
+
+export const insertImportLogSchema = createInsertSchema(importLogs).omit({ 
+  id: true
+});
+
+export type ImportLog = typeof importLogs.$inferSelect;
+export type InsertImportLog = z.infer<typeof insertImportLogSchema>;
