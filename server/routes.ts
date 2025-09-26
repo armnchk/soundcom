@@ -519,8 +519,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const activeOnly = req.query.activeOnly !== 'false';
       const collections = await storage.getCollections(activeOnly);
-      // Sort by sortOrder
-      const sortedCollections = collections.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+      // Sort by sortOrder, then by id for stable sorting when sortOrder is the same
+      const sortedCollections = collections.sort((a, b) => {
+        const sortOrderDiff = (a.sortOrder || 0) - (b.sortOrder || 0);
+        if (sortOrderDiff !== 0) return sortOrderDiff;
+        // If sortOrder is the same, sort by id (ascending = earlier created first)
+        return a.id - b.id;
+      });
       res.json(sortedCollections);
     } catch (error) {
       console.error("Error fetching collections:", error);
