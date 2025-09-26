@@ -1,5 +1,4 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { StarRating } from "./StarRating";
 import { MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -52,12 +51,12 @@ export function ReleaseCard({ release, onClick, className }: ReleaseCardProps) {
         </p>
         
         <div className="flex items-center justify-between">
-          <StarRating 
-            rating={release.averageRating} 
-            maxRating={5} 
-            size="sm"
-            data-testid="release-rating"
-          />
+          <div className="text-sm font-medium text-primary" data-testid="release-rating">
+            {release.averageRating && Number(release.averageRating) > 0 
+              ? Number(release.averageRating).toFixed(1) 
+              : '—'
+            }
+          </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <MessageCircle className="w-3 h-3" />
             <span data-testid="comment-count">{release.commentCount}</span>
