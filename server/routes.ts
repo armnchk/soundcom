@@ -569,6 +569,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test single artist API (temporary testing endpoint)
+  app.post('/api/test-single-artist', async (req, res) => {
+    try {
+      const { artistName } = req.body;
+      if (!artistName) {
+        return res.status(400).json({ message: "Artist name is required" });
+      }
+
+      console.log(`🧪 Тестирование артиста: ${artistName}`);
+      
+      // Simple test using combined music API
+      const combinedAPI = await import('./combined-music-api');
+      const musicAPI = new combinedAPI.CombinedMusicAPI();
+      
+      const result = await musicAPI.findArtist(artistName);
+      
+      if (!result) {
+        return res.json({
+          success: false,
+          message: `Artist "${artistName}" not found`,
+          albums: []
+        });
+      }
+      
+      const { artist, albums } = result;
+      
+      res.json({
+        success: true,
+        artist: {
+          name: artist.name,
+          source: artist.source,
+          id: artist.id
+        },
+        albums: albums.map(album => ({
+          title: album.title,
+          releaseDate: album.releaseDate,
+          type: album.albumType,
+          id: album.id
+        })),
+        totalAlbums: albums.length,
+        message: `Found ${albums.length} albums for ${artist.name}`
+      });
+    } catch (error: any) {
+      console.error("Error testing artist:", error);
+      res.status(500).json({ message: error.message || "Failed to test artist" });
+    }
+  });
+
   // Manual Daily Import Trigger - for testing
   app.post('/api/import/manual-daily', isAuthenticated, async (req: any, res) => {
     try {
