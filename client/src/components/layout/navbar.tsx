@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Music, Search, User, Settings, Shield, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Navbar() {
   const { user, isAuthenticated } = useAuth();
@@ -14,6 +14,21 @@ export default function Navbar() {
   
   // Hide search on homepage since it has its own search block
   const isHomePage = location === "/";
+
+  // Sync search query with URL parameters
+  useEffect(() => {
+    if (location.startsWith('/search')) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const q = urlParams.get('q');
+      if (q) {
+        setSearchQuery(q);
+      } else {
+        setSearchQuery("");
+      }
+    } else {
+      setSearchQuery("");
+    }
+  }, [location]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
