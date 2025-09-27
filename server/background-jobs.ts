@@ -1,7 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { db } from './db';
-import { importJobs, InsertImportJob } from '@shared/schema';
+import { importJobs, InsertImportJob, releases, artists } from '@shared/schema';
 import { importFromRussianPlaylist } from './music-importer';
+import { musicAPI } from './combined-music-api';
 
 // In-memory job processing queue
 const activeJobs = new Map<number, { cancel: boolean }>();
@@ -144,3 +145,71 @@ async function processImportJob(jobId: number) {
 
 // For now, we use the original import function without progress callbacks
 // TODO: Modify importFromRussianPlaylist to support progress callbacks
+
+// Background job для заполнения пропущенных дат релизов через iTunes API
+export async function fillMissingReleaseDates(): Promise<{
+  processed: number;
+  updated: number;
+  errors: number;
+}> {
+  console.log('📅 Starting background job to fill missing release dates...');
+  
+  let processed = 0;
+  let updated = 0;
+  let errors = 0;
+  
+  try {
+    // Получаем релизы без дат (лимит для обработки)
+    const releasesWithoutDates = await db
+      .select({
+        releaseId: releases.id,
+        releaseTitle: releases.title,
+        artistName: artists.name,
+      })
+      .from(releases)
+      .innerJoin(artists, sql`${releases.artistId} = ${artists.id}`)
+      .where(sql`${releases.releaseDate} IS NULL`)
+      .limit(50); // Ограничиваем, чтобы не перегружать iTunes API
+    
+    console.log(`📅 Найдено ${releasesWithoutDates.length} релизов без дат`);
+    
+    for (const release of releasesWithoutDates) {
+      try {
+        processed++;
+        
+        // Ищем дату через iTunes API
+        const releaseDate = await musicAPI.findReleaseDate(
+          release.artistName, 
+          release.releaseTitle
+        );
+        
+        if (releaseDate) {
+          // Обновляем релиз с найденной датой
+          await db
+            .update(releases)
+            .set({ releaseDate: new Date(releaseDate) })
+            .where(sql`id = ${release.releaseId}`);
+          
+          updated++;
+          console.log(`✅ Обновлен "${release.releaseTitle}" (${release.artistName}): ${releaseDate}`);
+        } else {
+          console.log(`❌ Дата не найдена для "${release.releaseTitle}" (${release.artistName})`);
+        }
+        
+        // Пауза между запросами к iTunes API
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } catch (error) {
+        errors++;
+        console.error(`❌ Ошибка при обработке "${release.releaseTitle}":`, error);
+      }
+    }
+    
+    console.log(`📅 Завершено: обработано ${processed}, обновлено ${updated}, ошибок ${errors}`);
+    return { processed, updated, errors };
+    
+  } catch (error) {
+    console.error('❌ Ошибка в background job fillMissingReleaseDates:', error);
+    throw error;
+  }
+}

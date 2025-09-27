@@ -224,6 +224,51 @@ class ITunesAPIClient {
     }
   }
   
+  // Поиск конкретного релиза для получения даты выхода
+  async searchReleaseDate(artistName: string, releaseTitle: string): Promise<string | null> {
+    try {
+      console.log(`🍎 iTunes: Ищем дату для "${releaseTitle}" от "${artistName}"`);
+      
+      const query = `${artistName} ${releaseTitle}`;
+      const response = await fetch(
+        `${this.baseUrl}/search?term=${encodeURIComponent(query)}&entity=album&limit=10`
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.results || data.results.length === 0) {
+        console.log(`🍎 iTunes: Релиз "${releaseTitle}" не найден`);
+        return null;
+      }
+      
+      // Ищем наиболее подходящий результат
+      const bestMatch = data.results.find((album: any) => {
+        const titleMatch = album.collectionName?.toLowerCase().includes(releaseTitle.toLowerCase()) ||
+                          releaseTitle.toLowerCase().includes(album.collectionName?.toLowerCase());
+        const artistMatch = album.artistName?.toLowerCase().includes(artistName.toLowerCase()) ||
+                           artistName.toLowerCase().includes(album.artistName?.toLowerCase());
+        return titleMatch && artistMatch;
+      });
+      
+      if (bestMatch && bestMatch.releaseDate) {
+        const releaseDate = bestMatch.releaseDate.split('T')[0];
+        console.log(`🍎 iTunes: Найдена дата "${releaseDate}" для "${releaseTitle}"`);
+        return releaseDate;
+      }
+      
+      console.log(`🍎 iTunes: Подходящий релиз не найден`);
+      return null;
+      
+    } catch (error) {
+      console.error(`🍎 iTunes error при поиске даты для "${releaseTitle}":`, error instanceof Error ? error.message : String(error));
+      return null;
+    }
+  }
+
   private mapItunesAlbumType(collectionType?: string): 'album' | 'single' | 'compilation' {
     if (!collectionType) return 'album';
     
@@ -315,6 +360,11 @@ export class CombinedMusicAPI {
     return { successful, failed };
   }
   
+  // Поиск даты релиза через iTunes (fallback для пропущенных дат)
+  async findReleaseDate(artistName: string, releaseTitle: string): Promise<string | null> {
+    return await this.itunes.searchReleaseDate(artistName, releaseTitle);
+  }
+
   // Тест доступности API
   async testAPIs(): Promise<{ deezer: boolean; itunes: boolean }> {
     console.log('🧪 Тестируем доступность музыкальных API...');

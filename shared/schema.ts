@@ -365,3 +365,21 @@ export const insertImportLogSchema = createInsertSchema(importLogs).omit({
 
 export type ImportLog = typeof importLogs.$inferSelect;
 export type InsertImportLog = z.infer<typeof insertImportLogSchema>;
+
+// Discography cache для ускорения импортов
+export const discographyCache = pgTable('discography_cache', {
+  id: serial('id').primaryKey(),
+  artistId: integer('artist_id').references(() => artists.id, { onDelete: 'cascade' }).notNull(),
+  source: varchar('source', { length: 20 }).notNull(), // 'deezer', 'itunes'
+  albumIds: text('album_ids').array().notNull(), // массив ID альбомов
+  lastUpdated: timestamp('last_updated').notNull().defaultNow(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const insertDiscographyCacheSchema = createInsertSchema(discographyCache).omit({ 
+  id: true,
+  createdAt: true
+});
+
+export type DiscographyCache = typeof discographyCache.$inferSelect;
+export type InsertDiscographyCache = z.infer<typeof insertDiscographyCacheSchema>;
