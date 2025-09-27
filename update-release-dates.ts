@@ -59,7 +59,7 @@ async function updateReleaseDates() {
                 if (foundDate) {
                     // Обновляем дату в базе данных
                     await db.update(releases)
-                        .set({ releaseDate: foundDate })
+                        .set({ releaseDate: new Date(foundDate) })
                         .where(sql`id = ${release.id}`);
                     
                     updated++;
