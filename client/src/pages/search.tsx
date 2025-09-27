@@ -68,10 +68,11 @@ export default function Search() {
   };
 
   const handleSortChange = (newSortBy: string) => {
-    setSortBy(newSortBy);
+    const actualSortBy = newSortBy === 'default' ? '' : newSortBy;
+    setSortBy(actualSortBy);
     const url = new URL(window.location.href);
-    if (newSortBy) {
-      url.searchParams.set('sortBy', newSortBy);
+    if (actualSortBy) {
+      url.searchParams.set('sortBy', actualSortBy);
     } else {
       url.searchParams.delete('sortBy');
     }
@@ -172,12 +173,12 @@ export default function Search() {
                       </h3>
                       <div className="flex items-center gap-2">
                         <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-                        <Select value={sortBy} onValueChange={handleSortChange}>
+                        <Select value={sortBy || 'default'} onValueChange={handleSortChange}>
                           <SelectTrigger className="w-40 bg-muted border-border" data-testid="select-sort">
                             <SelectValue placeholder="Сортировка" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="" data-testid="sort-default">
+                            <SelectItem value="default" data-testid="sort-default">
                               По умолчанию
                             </SelectItem>
                             <SelectItem value="date_desc" data-testid="sort-date-desc">
