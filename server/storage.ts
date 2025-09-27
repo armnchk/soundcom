@@ -274,7 +274,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchReleases(query: string, sortBy?: 'date_desc' | 'date_asc' | 'rating_desc' | 'rating_asc'): Promise<(Release & { artist: Artist; averageRating: number })[]> {
-    let queryBuilder = db
+    // Build the base query with groupBy and orderBy in the correct order
+    let orderByClause;
+    
+    if (sortBy === 'date_desc') {
+      orderByClause = [desc(releases.releaseDate), desc(releases.createdAt)];
+    } else if (sortBy === 'date_asc') {
+      orderByClause = [releases.releaseDate, releases.createdAt];
+    } else if (sortBy === 'rating_desc') {
+      orderByClause = [desc(sql`COALESCE(AVG(${ratings.score}), 0)`)];
+    } else if (sortBy === 'rating_asc') {
+      orderByClause = [sql`COALESCE(AVG(${ratings.score}), 0)`];
+    } else {
+      // Default sorting by relevance (no specific order)
+      orderByClause = [desc(releases.createdAt)];
+    }
+
+    const result = await db
       .select({
         id: releases.id,
         artistId: releases.artistId,
@@ -299,23 +315,9 @@ export class DatabaseStorage implements IStorage {
           ilike(artists.name, `%${query}%`)
         )
       )
-      .groupBy(releases.id, artists.id);
+      .groupBy(releases.id, artists.id)
+      .orderBy(...orderByClause);
 
-    // Apply sorting
-    if (sortBy === 'date_desc') {
-      queryBuilder = queryBuilder.orderBy(desc(releases.releaseDate), desc(releases.createdAt));
-    } else if (sortBy === 'date_asc') {
-      queryBuilder = queryBuilder.orderBy(releases.releaseDate, releases.createdAt);
-    } else if (sortBy === 'rating_desc') {
-      queryBuilder = queryBuilder.orderBy(desc(sql`COALESCE(AVG(${ratings.score}), 0)`));
-    } else if (sortBy === 'rating_asc') {
-      queryBuilder = queryBuilder.orderBy(sql`COALESCE(AVG(${ratings.score}), 0)`);
-    } else {
-      // Default sorting by relevance (no specific order)
-      queryBuilder = queryBuilder.orderBy(desc(releases.createdAt));
-    }
-
-    const result = await queryBuilder;
     return result as (Release & { artist: Artist; averageRating: number })[];
   }
 

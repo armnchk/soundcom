@@ -5,26 +5,37 @@ import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { ReleaseCard } from "@/components/release/release-card";
 import { Card, CardContent } from "@/components/ui/card";
-import { Music, Search as SearchIcon } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Music, Search as SearchIcon, ArrowUpDown } from "lucide-react";
 
 export default function Search() {
   const [location, setLocation] = useLocation();
   const [query, setQuery] = useState("");
+  const [sortBy, setSortBy] = useState<string>("");
   
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const q = urlParams.get('q');
+    const sort = urlParams.get('sortBy');
     if (q) {
       setQuery(q);
+    }
+    if (sort) {
+      setSortBy(sort);
     }
   }, [location]);
 
   const { data: releaseResults = [], isLoading: isLoadingReleases } = useQuery({
-    queryKey: ["/api/search", { q: query }],
+    queryKey: ["/api/search", { q: query, sortBy }],
     enabled: query.length > 2,
     queryFn: async ({ queryKey }) => {
-      const [, params] = queryKey as [string, { q: string }];
-      const response = await fetch(`/api/search?q=${encodeURIComponent(params.q)}`);
+      const [, params] = queryKey as [string, { q: string; sortBy: string }];
+      const url = new URL('/api/search', window.location.origin);
+      url.searchParams.set('q', params.q);
+      if (params.sortBy) {
+        url.searchParams.set('sortBy', params.sortBy);
+      }
+      const response = await fetch(url.toString());
       if (!response.ok) throw new Error('Search failed');
       return response.json();
     },
@@ -54,6 +65,17 @@ export default function Search() {
   const handleSearch = (searchQuery: string) => {
     setQuery(searchQuery);
     setLocation(`/search?q=${encodeURIComponent(searchQuery)}`);
+  };
+
+  const handleSortChange = (newSortBy: string) => {
+    setSortBy(newSortBy);
+    const url = new URL(window.location.href);
+    if (newSortBy) {
+      url.searchParams.set('sortBy', newSortBy);
+    } else {
+      url.searchParams.delete('sortBy');
+    }
+    setLocation(url.pathname + url.search);
   };
 
   return (
@@ -143,10 +165,37 @@ export default function Search() {
                 {/* Releases Section */}
                 {releaseResults.length > 0 && (
                   <section>
-                    <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                      <SearchIcon className="w-5 h-5" />
-                      Релизы ({releaseResults.length})
-                    </h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <SearchIcon className="w-5 h-5" />
+                        Релизы ({releaseResults.length})
+                      </h3>
+                      <div className="flex items-center gap-2">
+                        <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
+                        <Select value={sortBy} onValueChange={handleSortChange}>
+                          <SelectTrigger className="w-40 bg-muted border-border" data-testid="select-sort">
+                            <SelectValue placeholder="Сортировка" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="" data-testid="sort-default">
+                              По умолчанию
+                            </SelectItem>
+                            <SelectItem value="date_desc" data-testid="sort-date-desc">
+                              Новые релизы
+                            </SelectItem>
+                            <SelectItem value="date_asc" data-testid="sort-date-asc">
+                              Старые релизы
+                            </SelectItem>
+                            <SelectItem value="rating_desc" data-testid="sort-rating-desc">
+                              Высокий рейтинг
+                            </SelectItem>
+                            <SelectItem value="rating_asc" data-testid="sort-rating-asc">
+                              Низкий рейтинг
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
                       {releaseResults.map((release: any) => (
                         <ReleaseCard
