@@ -145,9 +145,9 @@ export async function runDailyMusicImport() {
 // Переменная для хранения активной задачи cron
 let scheduledTask: cron.ScheduledTask | null = null;
 
-// Запуск в 03:00 каждый день
+// Запуск в 00:30 каждый день
 export function scheduleDaily() {
-  console.log('⏰ Настройка автоматического планировщика для ежедневного импорта в 03:00');
+  console.log('⏰ Настройка автоматического планировщика для ежедневного импорта в 00:30');
   
   // Если уже есть запланированная задача, остановим её
   if (scheduledTask) {
@@ -155,8 +155,8 @@ export function scheduleDaily() {
     console.log('🛑 Предыдущая задача остановлена');
   }
   
-  // Запланируем новую задачу на каждый день в 03:00
-  scheduledTask = cron.schedule('0 3 * * *', async () => {
+  // Запланируем новую задачу на каждый день в 00:30
+  scheduledTask = cron.schedule('30 0 * * *', async () => {
     console.log('🌅 Автоматический запуск ежедневного импорта музыки...');
     
     try {
@@ -173,11 +173,11 @@ export function scheduleDaily() {
   const now = new Date();
   const nextRun = new Date();
   
-  // Если сейчас уже после 03:00, то следующий запуск завтра
-  if (now.getHours() >= 3) {
+  // Если сейчас уже после 00:30, то следующий запуск завтра
+  if (now.getHours() > 0 || (now.getHours() === 0 && now.getMinutes() >= 30)) {
     nextRun.setDate(nextRun.getDate() + 1);
   }
-  nextRun.setHours(3, 0, 0, 0);
+  nextRun.setHours(0, 30, 0, 0);
   
   const msUntilNextRun = nextRun.getTime() - now.getTime();
   const hoursUntilNextRun = Math.round(msUntilNextRun / (1000 * 60 * 60));
@@ -211,10 +211,10 @@ export function getSchedulerStatus() {
     const now = new Date();
     const nextRun = new Date();
     
-    if (now.getHours() >= 3) {
+    if (now.getHours() > 0 || (now.getHours() === 0 && now.getMinutes() >= 30)) {
       nextRun.setDate(nextRun.getDate() + 1);
     }
-    nextRun.setHours(3, 0, 0, 0);
+    nextRun.setHours(0, 30, 0, 0);
     
     const msUntilNextRun = nextRun.getTime() - now.getTime();
     const hoursUntilNextRun = Math.round(msUntilNextRun / (1000 * 60 * 60));
