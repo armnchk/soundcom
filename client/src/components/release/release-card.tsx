@@ -8,6 +8,7 @@ interface ReleaseCardProps {
     id: number;
     title: string;
     coverUrl?: string;
+    releaseDate?: string | null;
     artist: {
       name: string;
     };
@@ -47,9 +48,14 @@ export function ReleaseCard({ release, onClick, className }: ReleaseCardProps) {
         <h3 className="font-semibold text-foreground text-sm mb-1 truncate" data-testid="text-title">
           {release.title}
         </h3>
-        <p className="text-muted-foreground text-xs mb-2 truncate" data-testid="text-artist">
+        <p className="text-muted-foreground text-xs mb-1 truncate" data-testid="text-artist">
           {release.artist.name}
         </p>
+        {release.releaseDate && (
+          <p className="text-muted-foreground text-xs mb-2 truncate" data-testid="text-release-date">
+            {new Date(release.releaseDate).getFullYear()}
+          </p>
+        )}
         
         <div className="flex items-center justify-between">
           <StarRating 
