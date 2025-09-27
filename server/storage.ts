@@ -56,6 +56,7 @@ export interface IStorage {
   updateRelease(id: number, release: Partial<InsertRelease>): Promise<Release>;
   deleteRelease(id: number): Promise<void>;
   searchReleases(query: string): Promise<(Release & { artist: Artist })[]>;
+  searchArtists(query: string): Promise<(Artist & { latestReleaseCover?: string })[]>;
   
   // Rating operations
   getRating(userId: string, releaseId: number): Promise<Rating | undefined>;
@@ -298,6 +299,27 @@ export class DatabaseStorage implements IStorage {
       );
 
     return result as (Release & { artist: Artist })[];
+  }
+
+  async searchArtists(query: string): Promise<(Artist & { latestReleaseCover?: string })[]> {
+    const result = await db
+      .select({
+        id: artists.id,
+        name: artists.name,
+        spotifyId: artists.spotifyId,
+        createdAt: artists.createdAt,
+        latestReleaseCover: sql<string>`(
+          SELECT r.cover_url 
+          FROM releases r 
+          WHERE r.artist_id = artists.id 
+          ORDER BY r.release_date DESC, r.created_at DESC 
+          LIMIT 1
+        )`.as('latestReleaseCover'),
+      })
+      .from(artists)
+      .where(ilike(artists.name, `%${query}%`));
+
+    return result as (Artist & { latestReleaseCover?: string })[];
   }
 
   // Rating operations

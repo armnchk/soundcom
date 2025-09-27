@@ -188,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Search route
+  // Search routes
   app.get('/api/search', async (req, res) => {
     try {
       const { q } = req.query;
@@ -201,6 +201,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error searching releases:", error);
       res.status(500).json({ message: "Failed to search releases" });
+    }
+  });
+
+  app.get('/api/search/artists', async (req, res) => {
+    try {
+      const { q } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ message: "Search query required" });
+      }
+      
+      const artists = await storage.searchArtists(q);
+      res.json(artists);
+    } catch (error) {
+      console.error("Error searching artists:", error);
+      res.status(500).json({ message: "Failed to search artists" });
     }
   });
 
