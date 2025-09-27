@@ -65,30 +65,70 @@ class DeezerAPIClient {
     try {
       console.log(`🟡 Deezer: Получаем альбомы для артиста ${artistId}`);
       
-      const response = await fetch(`${this.baseUrl}/artist/${artistId}/albums?limit=100`);
+      // Основной запрос альбомов с максимальным лимитом
+      const response = await fetch(`${this.baseUrl}/artist/${artistId}/albums?limit=500`);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
       const data = await response.json();
+      const albums: UnifiedAlbum[] = [];
       
-      if (!data.data) {
-        return [];
+      if (data.data) {
+        albums.push(...data.data.map((album: any) => ({
+          id: album.id.toString(),
+          title: album.title,
+          releaseDate: album.release_date,
+          albumType: this.mapDeezerAlbumType(album.record_type),
+          trackCount: album.nb_tracks,
+          imageUrl: album.cover_medium || album.cover,
+          source: 'deezer' as const
+        })));
       }
       
-      const albums: UnifiedAlbum[] = data.data.map((album: any) => ({
-        id: album.id.toString(),
-        title: album.title,
-        releaseDate: album.release_date,
-        albumType: this.mapDeezerAlbumType(album.record_type),
-        trackCount: album.nb_tracks,
-        imageUrl: album.cover_medium || album.cover,
-        source: 'deezer' as const
-      }));
+      // Дополнительный поиск последних релизов через search API
+      try {
+        const artistResponse = await fetch(`${this.baseUrl}/artist/${artistId}`);
+        if (artistResponse.ok) {
+          const artistData = await artistResponse.json();
+          const artistName = artistData.name;
+          
+          // Поиск последних релизов через search API
+          const searchResponse = await fetch(`${this.baseUrl}/search/album?q=artist:"${encodeURIComponent(artistName)}"&limit=50`);
+          if (searchResponse.ok) {
+            const searchData = await searchResponse.json();
+            if (searchData.data) {
+              const existingIds = new Set(albums.map(a => a.id));
+              
+              // Добавляем найденные альбомы, которых еще нет
+              searchData.data
+                .filter((album: any) => album.artist && album.artist.id.toString() === artistId && !existingIds.has(album.id.toString()))
+                .forEach((album: any) => {
+                  albums.push({
+                    id: album.id.toString(),
+                    title: album.title,
+                    releaseDate: album.release_date,
+                    albumType: this.mapDeezerAlbumType(album.record_type),
+                    trackCount: album.nb_tracks,
+                    imageUrl: album.cover_medium || album.cover,
+                    source: 'deezer' as const
+                  });
+                });
+            }
+          }
+        }
+      } catch (searchError) {
+        console.log(`🟡 Deezer: Дополнительный поиск не удался для артиста ${artistId}`);
+      }
       
-      console.log(`🟡 Deezer: Найдено ${albums.length} альбомов`);
-      return albums;
+      // Удаляем дубликаты и сортируем по дате выхода
+      const uniqueAlbums = albums.filter((album, index, self) => 
+        index === self.findIndex(a => a.id === album.id)
+      ).sort((a, b) => new Date(b.releaseDate || '1900-01-01').getTime() - new Date(a.releaseDate || '1900-01-01').getTime());
+      
+      console.log(`🟡 Deezer: Найдено ${uniqueAlbums.length} уникальных альбомов`);
+      return uniqueAlbums;
       
     } catch (error) {
       console.error(`🟡 Deezer error при получении альбомов для ${artistId}:`, error instanceof Error ? error.message : String(error));
