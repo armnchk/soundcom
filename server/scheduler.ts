@@ -1,5 +1,5 @@
 import { importFromYandexPlaylist, updateAllArtists } from './music-importer';
-import { createImportJob } from './background-jobs';
+import { createImportJob, fillMissingReleaseDates } from './background-jobs';
 import { storage } from './storage';
 import * as cron from 'node-cron';
 
@@ -145,8 +145,9 @@ export async function runDailyMusicImport() {
   };
 }
 
-// Переменная для хранения активной задачи cron
+// Переменные для хранения активных задач cron
 let scheduledTask: cron.ScheduledTask | null = null;
+let weeklyReleaseDateTask: cron.ScheduledTask | null = null;
 
 // Запуск в 00:30 каждый день
 export function scheduleDaily() {
@@ -195,15 +196,53 @@ export function scheduleDaily() {
   };
 }
 
+// Еженедельное заполнение пропущенных дат релизов (каждое воскресенье в 02:00)
+export function scheduleWeeklyReleaseDateUpdate() {
+  console.log('📅 Настройка еженедельного обновления дат релизов (воскресенье 02:00)');
+  
+  // Если уже есть запланированная задача, остановим её
+  if (weeklyReleaseDateTask) {
+    weeklyReleaseDateTask.stop();
+    console.log('🛑 Предыдущая задача обновления дат остановлена');
+  }
+  
+  // Запланируем еженедельную задачу на воскресенье в 02:00
+  weeklyReleaseDateTask = cron.schedule('0 2 * * 0', async () => {
+    console.log('📅 Автоматический запуск обновления дат релизов...');
+    
+    try {
+      const result = await fillMissingReleaseDates();
+      console.log('✅ Обновление дат релизов завершено успешно');
+      console.log(`📊 Результат: обработано ${result.processed}, обновлено ${result.updated}, ошибок ${result.errors}`);
+    } catch (error) {
+      console.error('❌ Ошибка при обновлении дат релизов:', error);
+    }
+  }, {
+    timezone: "Europe/Moscow" // Московское время
+  });
+  
+  console.log('🚀 Еженедельное обновление дат релизов активировано!');
+}
+
 // Остановка автоматического планировщика
 export function stopScheduler() {
+  let stopped = false;
+  
   if (scheduledTask) {
     scheduledTask.stop();
     scheduledTask = null;
     console.log('🛑 Автоматический планировщик остановлен');
-    return true;
+    stopped = true;
   }
-  return false;
+  
+  if (weeklyReleaseDateTask) {
+    weeklyReleaseDateTask.stop();
+    weeklyReleaseDateTask = null;
+    console.log('🛑 Еженедельное обновление дат остановлено');
+    stopped = true;
+  }
+  
+  return stopped;
 }
 
 // Получение статуса планировщика

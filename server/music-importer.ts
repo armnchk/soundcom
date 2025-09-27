@@ -1,7 +1,7 @@
 import { parsePlaylist, parseMultiplePlaylists } from './russian-music-parsers';
 import { musicAPI } from './combined-music-api';
 import { db } from './db';
-import { artists, releases } from '../shared/schema';
+import { artists, releases, discographyCache } from '../shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
 export interface ImportStats {
@@ -114,6 +114,37 @@ async function createReleaseFromAlbum(album: any, artistId: number, source: 'dee
   await db.insert(releases).values(releaseData);
 }
 
+// Get cached discography for artist
+async function getCachedDiscography(artistId: number, source: 'deezer' | 'itunes'): Promise<string[] | null> {
+  const cached = await db.select()
+    .from(discographyCache)
+    .where(and(
+      eq(discographyCache.artistId, artistId),
+      eq(discographyCache.source, source)
+    ))
+    .limit(1);
+    
+  return cached.length > 0 ? cached[0].albumIds : null;
+}
+
+// Update discography cache for artist
+async function updateDiscographyCache(artistId: number, source: 'deezer' | 'itunes', albumIds: string[]) {
+  // Delete existing cache
+  await db.delete(discographyCache)
+    .where(and(
+      eq(discographyCache.artistId, artistId),
+      eq(discographyCache.source, source)
+    ));
+    
+  // Insert new cache
+  await db.insert(discographyCache).values({
+    artistId,
+    source,
+    albumIds,
+    lastUpdated: new Date()
+  });
+}
+
 // Process a single artist: find in combined music APIs and import discography
 async function processArtist(artistName: string): Promise<{
   newReleases: number;
@@ -143,11 +174,35 @@ async function processArtist(artistName: string): Promise<{
     
     console.log(`📀 Found ${albums.length} releases for ${artist.name}`);
     
+    // Check if we have existing artist to optimize with caching
+    const isExistingArtist = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
+    const isUpdate = isExistingArtist.length > 0 && isExistingArtist[0].lastUpdated;
+    
     let newReleases = 0;
     let skippedReleases = 0;
+    let albumsToProcess = albums;
     
-    for (const album of albums) {
-      // Check if release already exists
+    if (isUpdate) {
+      console.log(`🔄 Updating artist: ${artist.name}`);
+      
+      // Get cached discography
+      const cachedAlbumIds = await getCachedDiscography(artistId, artist.source);
+      
+      if (cachedAlbumIds && cachedAlbumIds.length > 0) {
+        // Filter only new albums that weren't in the cache
+        const currentAlbumIds = albums.map(album => album.id);
+        const newAlbumIds = currentAlbumIds.filter(id => !cachedAlbumIds.includes(id));
+        
+        albumsToProcess = albums.filter(album => newAlbumIds.includes(album.id));
+        skippedReleases = albums.length - albumsToProcess.length;
+        
+        console.log(`💾 Cache optimization: ${albumsToProcess.length} new albums, ${skippedReleases} cached`);
+      }
+    }
+    
+    // Process albums (either all for new artists, or only new ones for existing)
+    for (const album of albumsToProcess) {
+      // Double-check if release already exists (safety net)
       if (await releaseExists(album.id, artistId, album.title, album.source)) {
         skippedReleases++;
         continue;
@@ -157,8 +212,12 @@ async function processArtist(artistName: string): Promise<{
       await createReleaseFromAlbum(album, artistId, album.source);
       newReleases++;
       
-      console.log(`  ✅ Added release: "${album.title}" (${album.albumType})`);
+      console.log(`  ✅ Added: "${album.title}" (${album.albumType})`);
     }
+    
+    // Update discography cache with all current album IDs
+    const allAlbumIds = albums.map(album => album.id);
+    await updateDiscographyCache(artistId, artist.source, allAlbumIds);
     
     console.log(`📊 ${artist.name}: +${newReleases} новых, ~${skippedReleases} пропущено`);
     

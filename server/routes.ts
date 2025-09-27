@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { massImportService } from "./music-import";
-import { scheduleDaily, stopScheduler, getSchedulerStatus, runDailyMusicImport } from "./scheduler";
+import { scheduleDaily, stopScheduler, getSchedulerStatus, runDailyMusicImport, scheduleWeeklyReleaseDateUpdate } from "./scheduler";
 import { 
   insertArtistSchema, 
   insertReleaseSchema, 
@@ -1075,6 +1075,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const schedulerInfo = scheduleDaily();
+      
+      // Также запускаем еженедельное обновление дат релизов
+      scheduleWeeklyReleaseDateUpdate();
+      
       res.json({
         success: true,
         message: "Автоматический планировщик запущен",

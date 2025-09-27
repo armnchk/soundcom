@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
-import { scheduleDaily } from "./scheduler";
+import { scheduleDaily, scheduleWeeklyReleaseDateUpdate } from "./scheduler";
 
 const app = express();
 app.use(express.json());
@@ -74,6 +74,10 @@ app.use((req, res, next) => {
       const schedulerInfo = scheduleDaily();
       log(`🎵 Автоматический музыкальный импорт активирован`);
       log(`⏰ Следующий запуск через ${schedulerInfo.hoursUntilNextRun} часов`);
+      
+      // Запускаем еженедельное обновление дат релизов
+      scheduleWeeklyReleaseDateUpdate();
+      log(`📅 Еженедельное обновление дат релизов активировано`);
     } catch (error) {
       log(`❌ Ошибка запуска планировщика: ${error}`);
     }
