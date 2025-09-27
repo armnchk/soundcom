@@ -54,10 +54,8 @@ export async function runDailyMusicImport() {
     try {
       console.log(`🔄 Запускаем фоновое задание для плейлиста: ${playlist.name} (${playlist.url})`);
       
-      // Используем ID администратора для автоматического планировщика
-      const adminUsers = await storage.getAllUsers();
-      const adminUser = adminUsers.find(user => user.isAdmin);
-      const systemUserId = adminUser?.id || '47235098'; // Fallback к известному админу
+      // Используем ID известного администратора для автоматического планировщика  
+      const systemUserId = '47235098'; // ID администратора системы
       
       const jobId = await createImportJob({
         playlistUrl: playlist.url,
