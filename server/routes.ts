@@ -569,6 +569,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Manual Daily Import Trigger - for testing
+  app.post('/api/import/manual-daily', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+
+      console.log('🎯 Администратор запустил ручной импорт');
+      
+      // Import from scheduled daily import
+      const scheduler = await import('./scheduler');
+      const result = await scheduler.manualImportTrigger();
+      
+      res.json({
+        success: true,
+        stats: result,
+        message: 'Manual daily import completed successfully'
+      });
+    } catch (error: any) {
+      console.error("Error during manual daily import:", error);
+      res.status(500).json({ message: error.message || "Failed to run manual daily import" });
+    }
+  });
+
   // Background Import Jobs
   app.post('/api/import/background-playlist', isAuthenticated, async (req: any, res) => {
     try {

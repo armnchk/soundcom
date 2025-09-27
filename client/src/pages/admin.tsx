@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Trash2, X, Shield, Upload, Download, Database, Calendar, User, List, Search, Eye, FolderOpen, Plus, Album } from "lucide-react";
 import { useState } from "react";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Textarea } from "@/components/ui/textarea";
@@ -1984,6 +1984,30 @@ function PlaylistsTab() {
 function ImportLogsTab() {
   const { toast } = useToast();
 
+  // Мутация для ручного запуска импорта
+  const manualImportMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest('POST', '/api/import/manual-daily', {});
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Импорт запущен!",
+        description: "Автоматический импорт музыки запущен успешно. Результаты появятся в логах.",
+      });
+      // Обновляем данные
+      queryClient.invalidateQueries({ queryKey: ["/api/import-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/import-logs/latest"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка импорта",
+        description: error.message || "Не удалось запустить импорт",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Получаем историю логов импорта
   const { data: importLogs = [], isLoading: logsLoading } = useQuery({
     queryKey: ["/api/import-logs"],
@@ -2048,6 +2072,28 @@ function ImportLogsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Тестовый запуск импорта */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-xl font-bold text-white mb-2">Тестовый запуск</h3>
+              <p className="text-white/70 text-sm">
+                Запустить импорт всех плейлистов прямо сейчас, не дожидаясь автоматического запуска в 03:00
+              </p>
+            </div>
+            <Button
+              onClick={() => manualImportMutation.mutate()}
+              disabled={manualImportMutation.isPending}
+              className="bg-primary hover:bg-primary/90"
+              data-testid="button-manual-import"
+            >
+              {manualImportMutation.isPending ? 'Запускается...' : 'Запустить сейчас'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Последний импорт */}
       <Card>
         <CardContent className="p-6">
