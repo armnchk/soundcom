@@ -55,7 +55,7 @@ export interface IStorage {
   createRelease(release: InsertRelease): Promise<Release>;
   updateRelease(id: number, release: Partial<InsertRelease>): Promise<Release>;
   deleteRelease(id: number): Promise<void>;
-  searchReleases(query: string): Promise<(Release & { artist: Artist })[]>;
+  searchReleases(query: string, sortBy?: 'date_desc' | 'date_asc' | 'rating_desc' | 'rating_asc'): Promise<(Release & { artist: Artist; averageRating: number })[]>;
   searchArtists(query: string): Promise<(Artist & { latestReleaseCover?: string })[]>;
   
   // Rating operations
@@ -273,8 +273,8 @@ export class DatabaseStorage implements IStorage {
     await db.delete(releases).where(eq(releases.id, id));
   }
 
-  async searchReleases(query: string): Promise<(Release & { artist: Artist })[]> {
-    const result = await db
+  async searchReleases(query: string, sortBy?: 'date_desc' | 'date_asc' | 'rating_desc' | 'rating_asc'): Promise<(Release & { artist: Artist; averageRating: number })[]> {
+    let queryBuilder = db
       .select({
         id: releases.id,
         artistId: releases.artistId,
@@ -288,17 +288,35 @@ export class DatabaseStorage implements IStorage {
           name: artists.name,
           createdAt: artists.createdAt,
         },
+        averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`.as('averageRating'),
       })
       .from(releases)
       .leftJoin(artists, eq(releases.artistId, artists.id))
+      .leftJoin(ratings, eq(ratings.releaseId, releases.id))
       .where(
         or(
           ilike(releases.title, `%${query}%`),
           ilike(artists.name, `%${query}%`)
         )
-      );
+      )
+      .groupBy(releases.id, artists.id);
 
-    return result as (Release & { artist: Artist })[];
+    // Apply sorting
+    if (sortBy === 'date_desc') {
+      queryBuilder = queryBuilder.orderBy(desc(releases.releaseDate), desc(releases.createdAt));
+    } else if (sortBy === 'date_asc') {
+      queryBuilder = queryBuilder.orderBy(releases.releaseDate, releases.createdAt);
+    } else if (sortBy === 'rating_desc') {
+      queryBuilder = queryBuilder.orderBy(desc(sql`COALESCE(AVG(${ratings.score}), 0)`));
+    } else if (sortBy === 'rating_asc') {
+      queryBuilder = queryBuilder.orderBy(sql`COALESCE(AVG(${ratings.score}), 0)`);
+    } else {
+      // Default sorting by relevance (no specific order)
+      queryBuilder = queryBuilder.orderBy(desc(releases.createdAt));
+    }
+
+    const result = await queryBuilder;
+    return result as (Release & { artist: Artist; averageRating: number })[];
   }
 
   async searchArtists(query: string): Promise<(Artist & { latestReleaseCover?: string })[]> {

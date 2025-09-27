@@ -191,12 +191,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Search routes
   app.get('/api/search', async (req, res) => {
     try {
-      const { q } = req.query;
+      const { q, sortBy } = req.query;
       if (!q || typeof q !== 'string') {
         return res.status(400).json({ message: "Search query required" });
       }
       
-      const releases = await storage.searchReleases(q);
+      const validSortOptions = ['date_desc', 'date_asc', 'rating_desc', 'rating_asc'];
+      const sort = sortBy && typeof sortBy === 'string' && validSortOptions.includes(sortBy) ? 
+        sortBy as 'date_desc' | 'date_asc' | 'rating_desc' | 'rating_asc' : undefined;
+      
+      const releases = await storage.searchReleases(q, sort);
       res.json(releases);
     } catch (error) {
       console.error("Error searching releases:", error);
