@@ -2008,28 +2008,6 @@ function ImportLogsTab() {
     },
   });
 
-  // Мутация для тестирования iTunes API
-  const itunesTestMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch('/api/test-itunes-dates');
-      if (!response.ok) throw new Error('Failed to test iTunes API');
-      return response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Тест iTunes API завершен!",
-        description: `Найдено дат: ${data.summary.foundDates} из ${data.summary.total} (${data.summary.effectiveness})`,
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка теста iTunes API",
-        description: error.message || "Не удалось запустить тест",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Получаем историю логов импорта
   const { data: importLogs = [], isLoading: logsLoading } = useQuery({
     queryKey: ["/api/import-logs"],
