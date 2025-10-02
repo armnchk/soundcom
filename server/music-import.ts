@@ -9,7 +9,6 @@ interface ImportedRelease {
   album: string;
   releaseDate: string;
   coverUrl?: string;
-  spotifyUrl?: string;
   genres?: string[];
   trackCount?: number;
 }
@@ -269,67 +268,6 @@ export class MusicBrainzImporter {
 export class MassImportService {
   private musicBrainz = new MusicBrainzImporter();
   
-  /**
-   * Импорт нескольких исполнителей
-   */
-  async importArtists(artistNames: string[]): Promise<{ success: number; errors: string[] }> {
-    let successCount = 0;
-    const errors: string[] = [];
-    
-    for (const artistName of artistNames) {
-      try {
-        // 1. Импортировать релизы из MusicBrainz
-        const releases = await this.musicBrainz.importArtistReleases(artistName);
-        
-        // 2. Сохранить в нашу БД
-        for (const release of releases) {
-          await this.saveReleaseToDatabase(release);
-        }
-        
-        successCount += releases.length;
-        console.log(`✅ Успешно импортировано ${releases.length} релизов для ${artistName}`);
-        
-      } catch (error) {
-        const errorMsg = `Ошибка импорта ${artistName}: ${error}`;
-        errors.push(errorMsg);
-        console.error(errorMsg);
-      }
-    }
-    
-    return { success: successCount, errors };
-  }
-
-  /**
-   * Импорт релизов по годам выпуска
-   */
-  async importByYears(years: number[]): Promise<{ success: number; errors: string[] }> {
-    let successCount = 0;
-    const errors: string[] = [];
-    
-    for (const year of years) {
-      try {
-        console.log(`🗓️ Импорт релизов ${year} года...`);
-        
-        // 1. Получить релизы из MusicBrainz по году
-        const releases = await this.musicBrainz.importReleasesByYear(year);
-        
-        // 2. Сохранить в нашу БД
-        for (const release of releases) {
-          await this.saveReleaseToDatabase(release);
-        }
-        
-        successCount += releases.length;
-        console.log(`✅ Успешно импортировано ${releases.length} релизов за ${year} год`);
-        
-      } catch (error) {
-        const errorMsg = `Ошибка импорта за ${year} год: ${error}`;
-        errors.push(errorMsg);
-        console.error(errorMsg);
-      }
-    }
-    
-    return { success: successCount, errors };
-  }
   
   /**
    * Сохранение релиза в БД
@@ -358,10 +296,7 @@ export class MassImportService {
         title: release.album,
         releaseDate: new Date(release.releaseDate),
         coverUrl: release.coverUrl || null,
-        streamingLinks: release.spotifyUrl ? {
-          spotify: release.spotifyUrl,
-          appleMusic: null
-        } : null,
+        streamingLinks: null,
         type: 'album'
       };
       
@@ -374,21 +309,6 @@ export class MassImportService {
     }
   }
   
-  /**
-   * Получить статистику импорта
-   */
-  async getImportStats(): Promise<{ totalReleases: number; realReleases: number; testReleases: number; totalArtists: number }> {
-    const allReleases = await storage.getReleases({ includeTestData: true });
-    const realReleases = await storage.getReleases({ includeTestData: false });
-    const artists = await storage.getArtists();
-    
-    return {
-      totalReleases: allReleases.length,
-      realReleases: realReleases.length,
-      testReleases: allReleases.length - realReleases.length,
-      totalArtists: artists.length
-    };
-  }
 }
 
 // Экспорт для использования в роутах

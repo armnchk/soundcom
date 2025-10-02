@@ -25,8 +25,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      // Отключаем кэширование
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
+      // Возвращаем данные пользователя из сессии
+      const user = {
+        id: req.user.id,
+        google_id: req.user.claims.sub,
+        email: req.user.claims.email,
+        firstName: req.user.claims.first_name || req.user.claims.given_name || '',
+        lastName: req.user.claims.last_name || req.user.claims.family_name || '',
+        profileImageUrl: req.user.claims.picture || null,
+        isAdmin: req.user.is_admin || false,
+        nickname: req.user.nickname || null
+      };
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -85,9 +99,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/artists', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -135,9 +148,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/releases', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -152,9 +164,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/releases/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -170,9 +181,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/releases/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -387,9 +397,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Import endpoints (MTS/Zvuk parsing and Deezer/iTunes API)
   app.get('/api/import/stats', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
       const stats = await storage.getImportStats();
@@ -400,11 +409,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Временный эндпоинт для тестирования без авторизации
+  app.post('/api/import/test-playlist-debug', async (req: any, res) => {
+    try {
+      const { playlistUrl } = req.body;
+      if (!playlistUrl || typeof playlistUrl !== 'string') {
+        return res.status(400).json({ message: "Playlist URL is required" });
+      }
+      console.log('🎵 Тестируем импорт плейлиста:', playlistUrl);
+      const musicImporter = await import('./music-importer');
+      const result = await musicImporter.importFromRussianPlaylist(playlistUrl);
+      res.json({ success: true, stats: result });
+    } catch (error: any) {
+      console.error("Error testing playlist import:", error);
+      res.status(500).json({ message: error.message || "Failed to import playlist" });
+    }
+  });
+
   app.post('/api/import/test-playlist', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Access denied. Admin rights required." });
       }
       const { playlistUrl } = req.body;
@@ -422,9 +447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/import/update-artists', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Access denied. Admin rights required." });
       }
       const musicImporter = await import('./music-importer');
@@ -439,9 +463,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Background Import Jobs
   app.post('/api/import/background-playlist', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Access denied. Admin rights required." });
       }
       const { playlistUrl } = req.body;
@@ -463,11 +486,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/import/jobs', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Access denied. Admin rights required." });
       }
+      const userId = req.user.id;
       const backgroundJobs = await import('./background-jobs');
       const jobs = await backgroundJobs.getAllImportJobs(userId);
       res.json(jobs);
@@ -479,9 +502,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/import/jobs/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Access denied. Admin rights required." });
       }
       const jobId = parseInt(req.params.id);
@@ -502,9 +524,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/import/jobs/:id/cancel', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Access denied. Admin rights required." });
       }
       const jobId = parseInt(req.params.id);
@@ -526,9 +547,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Import Logs endpoints
   app.get('/api/import-logs', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
@@ -542,9 +562,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/import-logs/latest', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
       const latestLog = await storage.getLatestImportLog();
@@ -572,9 +591,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin routes
   app.get('/api/admin/reports', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -589,9 +607,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/admin/reports/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -610,78 +627,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Mass import endpoint for admin (by artists)
-  app.post('/api/admin/import', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const { artists } = req.body;
-      if (!artists || !Array.isArray(artists)) {
-        return res.status(400).json({ message: "Artists array is required" });
-      }
-
-      const result = await massImportService.importArtists(artists);
-      res.json(result);
-    } catch (error) {
-      console.error("Error importing artists:", error);
-      res.status(500).json({ message: "Failed to import artists" });
-    }
-  });
-
-  // Mass import endpoint for admin (by years)
-  app.post('/api/admin/import/years', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const { years } = req.body;
-      if (!years || !Array.isArray(years)) {
-        return res.status(400).json({ message: "Years array is required" });
-      }
-
-      // Validate years are numbers
-      const validYears = years.filter((year: any) => 
-        typeof year === 'number' && year >= 1900 && year <= new Date().getFullYear()
-      );
-
-      if (validYears.length === 0) {
-        return res.status(400).json({ message: "Valid years (1900-current) are required" });
-      }
-
-      const result = await massImportService.importByYears(validYears);
-      res.json(result);
-    } catch (error) {
-      console.error("Error importing by years:", error);
-      res.status(500).json({ message: "Failed to import by years" });
-    }
-  });
-
-  // Import stats endpoint for admin
-  app.get('/api/admin/import/stats', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const stats = await massImportService.getImportStats();
-      res.json(stats);
-    } catch (error) {
-      console.error("Error fetching import stats:", error);
-      res.status(500).json({ message: "Failed to fetch import stats" });
-    }
-  });
 
   // Import features removed
 
@@ -756,10 +701,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/collections', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -792,10 +735,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/collections/:id', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -834,10 +775,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/collections/:id', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -853,10 +792,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/collections/:id/releases', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -878,10 +815,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete('/api/collections/:id/releases/:releaseId', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -899,10 +834,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/collections/:id/releases/:releaseId/sort', isAuthenticated, async (req: any, res) => {
     try {
       // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -922,13 +855,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin collections endpoints
+  app.get('/api/admin/collections', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const collections = await storage.getCollections(false); // Get all collections for admin
+      res.json(collections);
+    } catch (error) {
+      console.error("Error fetching admin collections:", error);
+      res.status(500).json({ message: "Failed to fetch collections" });
+    }
+  });
+
+  app.post('/api/admin/collections', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const collection = await storage.createCollection({
+        ...req.body,
+        userId: userId
+      });
+      res.json(collection);
+    } catch (error) {
+      console.error("Error creating collection:", error);
+      res.status(500).json({ message: "Failed to create collection" });
+    }
+  });
+
+  app.delete('/api/admin/collections/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      await storage.deleteCollection(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting collection:", error);
+      res.status(500).json({ message: "Failed to delete collection" });
+    }
+  });
+
+  app.post('/api/admin/collections/:id/releases', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const { releaseId, sortOrder } = req.body;
+      const collectionId = parseInt(req.params.id);
+      
+      const collectionRelease = await storage.addReleaseToCollection(collectionId, releaseId, sortOrder);
+      res.json(collectionRelease);
+    } catch (error) {
+      console.error("Error adding release to collection:", error);
+      res.status(500).json({ message: "Failed to add release to collection" });
+    }
+  });
+
+  app.delete('/api/admin/collections/:id/releases/:releaseId', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const collectionId = parseInt(req.params.id);
+      const releaseId = parseInt(req.params.releaseId);
+      
+      await storage.removeReleaseFromCollection(collectionId, releaseId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing release from collection:", error);
+      res.status(500).json({ message: "Failed to remove release from collection" });
+    }
+  });
 
   app.post('/api/import/update-artists', isAuthenticated, async (req: any, res) => {
     try {
-      // Check if user is admin
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
@@ -956,24 +971,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/import/stats', isAuthenticated, async (req: any, res) => {
     try {
-      // Check if user is admin
-      const user = await storage.getUser(req.session.userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Unauthorized" });
       }
 
       // Get database statistics - we'll add these methods to storage interface
       const totalArtists = 0; // await storage.getArtistCount();
       const totalReleases = 0; // await storage.getReleaseCount();
-      const artistsWithSpotify = 0; // await storage.getArtistsWithSpotifyCount();
+      const artistsWithDeezer = 0; // await storage.getArtistsWithDeezerCount();
       const recentReleases = 0; // await storage.getRecentReleasesCount(7);
 
       res.json({
         totalArtists,
         totalReleases,
-        artistsWithSpotify,
+        artistsWithDeezer,
         recentReleases,
-        spotifyIntegration: artistsWithSpotify > 0 ? 'connected' : 'not_connected'
+        deezerIntegration: artistsWithDeezer > 0 ? 'connected' : 'not_connected'
       });
 
     } catch (error) {
@@ -987,9 +1001,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auto Import Playlists management (Admin only)
   app.get('/api/auto-import-playlists', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -1003,18 +1016,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/auto-import-playlists', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
-
-      console.log("Received playlist data:", JSON.stringify(req.body, null, 2));
       
-      const validated = insertAutoImportPlaylistSchema.parse(req.body);
-      console.log("Validated playlist data:", JSON.stringify(validated, null, 2));
+      // Добавляем user_id к данным плейлиста
+      const playlistData = {
+        ...req.body,
+        user_id: req.user.id
+      };
+      
+      const validated = insertAutoImportPlaylistSchema.parse(playlistData);
       
       const playlist = await storage.createAutoImportPlaylist(validated);
+      
       res.json(playlist);
     } catch (error) {
       console.error("Error creating auto playlist:", error);
@@ -1034,9 +1050,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put('/api/auto-import-playlists/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -1052,9 +1067,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete('/api/auto-import-playlists/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -1067,8 +1081,340 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  
+  // Manual daily import - запуск импорта всех плейлистов
+  app.post('/api/import/manual-daily', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
 
+      console.log('🚀 Запускаем ежедневный импорт всех плейлистов...');
+      
+      // Получаем все включенные плейлисты
+      const playlists = await storage.getAutoImportPlaylists();
+      const enabledPlaylists = playlists.filter(p => p.enabled);
+      
+      console.log(`📋 Найдено ${enabledPlaylists.length} включенных плейлистов`);
+      
+      if (enabledPlaylists.length === 0) {
+        return res.json({ 
+          success: true, 
+          message: 'Нет включенных плейлистов для импорта',
+          playlistsProcessed: 0
+        });
+      }
+
+      // Создаем задачи импорта для каждого плейлиста
+      const backgroundJobs = await import('./background-jobs');
+      const jobIds = [];
+      
+      for (const playlist of enabledPlaylists) {
+        try {
+          const jobId = await backgroundJobs.createImportJob({
+            playlist_id: playlist.id,
+            status: 'pending'
+          });
+          jobIds.push(jobId);
+          console.log(`✅ Создана задача импорта ${jobId} для плейлиста: ${playlist.name}`);
+        } catch (error) {
+          console.error(`❌ Ошибка создания задачи для плейлиста ${playlist.name}:`, error);
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Создано ${jobIds.length} задач импорта`,
+        jobIds,
+        playlistsProcessed: enabledPlaylists.length
+      });
+    } catch (error) {
+      console.error("Error starting manual daily import:", error);
+      res.status(500).json({ message: error.message || "Failed to start daily import" });
+    }
+  });
+
+  // Эндпоинт для миграции полей релизов
+  app.post('/api/migrate/release-fields', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем, что пользователь админ
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      console.log('🔄 Добавляем новые поля в таблицу releases...');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_small TEXT;
+      `);
+      console.log('✅ Добавлено поле cover_small');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_medium TEXT;
+      `);
+      console.log('✅ Добавлено поле cover_medium');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_big TEXT;
+      `);
+      console.log('✅ Добавлено поле cover_big');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_xl TEXT;
+      `);
+      console.log('✅ Добавлено поле cover_xl');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS duration INTEGER;
+      `);
+      console.log('✅ Добавлено поле duration');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS explicit_lyrics BOOLEAN DEFAULT FALSE;
+      `);
+      console.log('✅ Добавлено поле explicit_lyrics');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS explicit_content_lyrics INTEGER DEFAULT 0;
+      `);
+      console.log('✅ Добавлено поле explicit_content_lyrics');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS explicit_content_cover INTEGER DEFAULT 0;
+      `);
+      console.log('✅ Добавлено поле explicit_content_cover');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS genres JSONB;
+      `);
+      console.log('✅ Добавлено поле genres');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS upc VARCHAR(50);
+      `);
+      console.log('✅ Добавлено поле upc');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS label VARCHAR(255);
+      `);
+      console.log('✅ Добавлено поле label');
+      
+      await db.execute(sql`
+        ALTER TABLE releases ADD COLUMN IF NOT EXISTS contributors JSONB;
+      `);
+      console.log('✅ Добавлено поле contributors');
+      
+      console.log('🎉 Миграция завершена успешно!');
+      res.json({ message: "Migration completed successfully" });
+      
+    } catch (error) {
+      console.error('❌ Ошибка миграции:', error);
+      res.status(500).json({ message: "Migration failed", error: error.message });
+    }
+  });
+
+  // Эндпоинт для удаления поля fans из таблицы releases
+  app.post('/api/migrate/remove-fans-field', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем, что пользователь админ
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      console.log('🔄 Удаляем поле fans из таблицы releases...');
+      
+      await db.execute(sql`
+        ALTER TABLE releases DROP COLUMN IF EXISTS fans;
+      `);
+      console.log('✅ Удалено поле fans');
+      
+      console.log('🎉 Миграция завершена успешно!');
+      res.json({ message: "Migration completed successfully" });
+      
+    } catch (error) {
+      console.error('❌ Ошибка миграции:', error);
+      res.status(500).json({ message: "Migration failed", error: error.message });
+    }
+  });
+
+  // ВРЕМЕННЫЙ endpoint для миграции без аутентификации (только для dev)
+  app.post('/api/migrate/dev', async (req, res) => {
+    try {
+      console.log('🔄 [DEV] Выполняем миграцию базы данных...\n');
+      
+      // Добавляем новые поля
+      console.log('📝 Добавляем новые поля в таблицу releases...');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_small TEXT;`);
+      console.log('✅ Добавлено поле cover_small');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_medium TEXT;`);
+      console.log('✅ Добавлено поле cover_medium');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_big TEXT;`);
+      console.log('✅ Добавлено поле cover_big');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS cover_xl TEXT;`);
+      console.log('✅ Добавлено поле cover_xl');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS duration INTEGER;`);
+      console.log('✅ Добавлено поле duration');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS explicit_lyrics BOOLEAN DEFAULT FALSE;`);
+      console.log('✅ Добавлено поле explicit_lyrics');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS explicit_content_lyrics INTEGER DEFAULT 0;`);
+      console.log('✅ Добавлено поле explicit_content_lyrics');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS explicit_content_cover INTEGER DEFAULT 0;`);
+      console.log('✅ Добавлено поле explicit_content_cover');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS genres JSONB;`);
+      console.log('✅ Добавлено поле genres');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS upc VARCHAR(50);`);
+      console.log('✅ Добавлено поле upc');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS label VARCHAR(255);`);
+      console.log('✅ Добавлено поле label');
+      
+      await db.execute(sql`ALTER TABLE releases ADD COLUMN IF NOT EXISTS contributors JSONB;`);
+      console.log('✅ Добавлено поле contributors');
+      
+      // Удаляем поле fans
+      console.log('\n🗑️  Удаляем поле fans из таблицы releases...');
+      await db.execute(sql`ALTER TABLE releases DROP COLUMN IF EXISTS fans;`);
+      console.log('✅ Удалено поле fans');
+      
+      console.log('\n🎉 Миграция завершена успешно!');
+      res.json({ 
+        success: true, 
+        message: "Migration completed successfully",
+        fields_added: [
+          'cover_small', 'cover_medium', 'cover_big', 'cover_xl',
+          'duration', 'explicit_lyrics', 'explicit_content_lyrics', 
+          'explicit_content_cover', 'genres', 'upc', 'label', 'contributors'
+        ],
+        fields_removed: ['fans']
+      });
+      
+    } catch (error) {
+      console.error('❌ Ошибка миграции:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Migration failed", 
+        error: error.message 
+      });
+    }
+  });
+
+  // ВРЕМЕННЫЙ endpoint для очистки только релизов (только для dev)
+  app.post('/api/migrate/clean-releases', async (req, res) => {
+    try {
+      console.log('🧹 [DEV] Очищаем только релизы...\n');
+      
+      const clearedTables = [];
+      const errors = [];
+      
+      // Сначала получаем количество релизов до очистки
+      const countBefore = await db.execute(sql`SELECT COUNT(*) as count FROM releases;`);
+      const releasesCountBefore = countBefore.rows[0]?.count || 0;
+      console.log(`📊 Релизов до очистки: ${releasesCountBefore}`);
+      
+      // Очищаем связанные таблицы (в правильном порядке)
+      try {
+        await db.execute(sql`DELETE FROM ratings WHERE release_id IN (SELECT id FROM releases);`);
+        clearedTables.push('ratings (связанные с релизами)');
+        console.log('✅ Очищены рейтинги релизов');
+      } catch (error) {
+        errors.push(`ratings: ${error.message}`);
+        console.log('⚠️ Ошибка очистки рейтингов:', error.message);
+      }
+      
+      try {
+        await db.execute(sql`DELETE FROM comments WHERE release_id IN (SELECT id FROM releases);`);
+        clearedTables.push('comments (связанные с релизами)');
+        console.log('✅ Очищены комментарии релизов');
+      } catch (error) {
+        errors.push(`comments: ${error.message}`);
+        console.log('⚠️ Ошибка очистки комментариев:', error.message);
+      }
+      
+      try {
+        await db.execute(sql`DELETE FROM collection_releases WHERE release_id IN (SELECT id FROM releases);`);
+        clearedTables.push('collection_releases (связанные с релизами)');
+        console.log('✅ Очищены связи коллекций с релизами');
+      } catch (error) {
+        errors.push(`collection_releases: ${error.message}`);
+        console.log('⚠️ Ошибка очистки связей коллекций:', error.message);
+      }
+      
+      // Теперь очищаем сами релизы
+      try {
+        await db.execute(sql`DELETE FROM releases;`);
+        clearedTables.push('releases');
+        console.log('✅ Очищена таблица releases');
+      } catch (error) {
+        errors.push(`releases: ${error.message}`);
+        console.log('⚠️ Ошибка очистки релизов:', error.message);
+      }
+      
+      // Получаем количество релизов после очистки
+      const countAfter = await db.execute(sql`SELECT COUNT(*) as count FROM releases;`);
+      const releasesCountAfter = countAfter.rows[0]?.count || 0;
+      console.log(`📊 Релизов после очистки: ${releasesCountAfter}`);
+      
+      console.log('\n🎉 Очистка релизов завершена!');
+      console.log(`Удалено релизов: ${releasesCountBefore - releasesCountAfter}`);
+      console.log(`Очищено связанных таблиц: ${clearedTables.length}`);
+      if (errors.length > 0) {
+        console.log(`Ошибок: ${errors.length}`);
+      }
+      
+      res.json({ 
+        success: true, 
+        message: "Releases cleaned successfully",
+        tables_cleared: clearedTables,
+        errors: errors,
+        releases_before: releasesCountBefore,
+        releases_after: releasesCountAfter,
+        releases_deleted: releasesCountBefore - releasesCountAfter,
+        cleared_count: clearedTables.length,
+        error_count: errors.length
+      });
+      
+    } catch (error) {
+      console.error('❌ Критическая ошибка очистки:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Releases cleanup failed", 
+        error: error.message 
+      });
+    }
+  });
+
+  // ВРЕМЕННЫЙ endpoint для очистки кэша дискографии (только для dev)
+  app.post('/api/migrate/clear-cache', async (req, res) => {
+    try {
+      console.log('🧹 [DEV] Очищаем кэш дискографии...\n');
+      
+      await db.execute(sql`DELETE FROM discography_cache;`);
+      console.log('✅ Очищен кэш дискографии');
+      
+      res.json({ 
+        success: true, 
+        message: "Discography cache cleared successfully"
+      });
+      
+    } catch (error) {
+      console.error('❌ Ошибка очистки кэша:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Cache cleanup failed", 
+        error: error.message 
+      });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;

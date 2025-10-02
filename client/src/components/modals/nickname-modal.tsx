@@ -24,6 +24,7 @@ export function NicknameModal({ open, onClose }: NicknameModalProps) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      localStorage.setItem('nicknameModalShown', 'true');
       onClose();
       toast({ title: "Welcome to MusicReview!" });
     },

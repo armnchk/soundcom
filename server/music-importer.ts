@@ -13,59 +13,94 @@ export interface ImportStats {
 }
 
 // Find or create artist in database
-async function findOrCreateArtist(artistName: string, yandexMusicUrl?: string, yandexMusicId?: string) {
+export async function findOrCreateArtist(artistName: string, source?: string, sourceId?: string) {
   // First try to find existing artist by name
   const existing = await db.select().from(artists).where(eq(artists.name, artistName)).limit(1);
   
   if (existing.length > 0) {
     const artist = existing[0];
     
-    // Update with Yandex Music info if we have it and it's missing
-    if ((yandexMusicUrl || yandexMusicId) && (!artist.yandexMusicUrl || !artist.yandexMusicId)) {
-      await db.update(artists)
-        .set({
-          yandexMusicUrl: yandexMusicUrl || artist.yandexMusicUrl,
-          yandexMusicId: yandexMusicId || artist.yandexMusicId,
-          lastUpdated: new Date()
-        })
-        .where(eq(artists.id, artist.id));
+    // Update with external music service info if we have it and it's missing
+    if (source && sourceId) {
+      const updateData: any = { last_updated: new Date() };
+      
+      if (source === 'deezer' && !artist.deezer_id) {
+        updateData.deezer_id = sourceId;
+      } else if (source === 'itunes' && !artist.itunes_id) {
+        updateData.itunes_id = sourceId;
+      } else if (source === 'mts' && !artist.mts_music_id) {
+        updateData.mts_music_id = sourceId;
+      }
+      
+      if (Object.keys(updateData).length > 1) {
+        await db.update(artists)
+          .set(updateData)
+          .where(eq(artists.id, artist.id));
+      }
     }
     
     return artist.id;
   }
   
   // Create new artist
+  const newArtistData: any = {
+    name: artistName,
+    last_updated: new Date()
+  };
+  
+  if (source && sourceId) {
+    if (source === 'deezer') {
+      newArtistData.deezer_id = sourceId;
+    } else if (source === 'itunes') {
+      newArtistData.itunes_id = sourceId;
+    } else if (source === 'mts') {
+      newArtistData.mts_music_id = sourceId;
+    }
+  }
+  
   const newArtist = await db.insert(artists)
-    .values({
-      name: artistName,
-      yandexMusicUrl,
-      yandexMusicId,
-      lastUpdated: new Date()
-    })
+    .values(newArtistData)
     .returning({ id: artists.id });
     
   return newArtist[0].id;
 }
 
 // Update artist with external music service information
-async function updateArtistWithMusicInfo(artistId: number, artistInfo: any, source: 'deezer' | 'itunes') {
+export async function updateArtistWithMusicInfo(artistId: number, artistInfo: any, source: 'deezer' | 'itunes') {
+  console.log(`🔧 Updating artist ${artistId} with ${source} data:`, JSON.stringify(artistInfo, null, 2));
+  
+  if (!artistInfo || !artistInfo.id) {
+    console.log(`❌ Invalid artist info:`, artistInfo);
+    return;
+  }
+  
   const updateData: any = {
-    lastUpdated: new Date()
+    last_updated: new Date()
   };
   
   if (source === 'deezer') {
-    updateData.deezerId = artistInfo.id;
-    updateData.genres = artistInfo.genres;
-    updateData.popularity = artistInfo.popularity;
-    updateData.imageUrl = artistInfo.imageUrl;
+    updateData.deezer_id = artistInfo.id;
+    updateData.genres = artistInfo.genres || [];
+    updateData.popularity = artistInfo.popularity || 0;
+    updateData.followers = artistInfo.followers || artistInfo.popularity || 0;
+    updateData.image_url = artistInfo.imageUrl;
+    console.log(`   ✅ Deezer update data:`, updateData);
   } else if (source === 'itunes') {
-    updateData.itunesId = artistInfo.id;
-    updateData.genres = artistInfo.genres;
+    updateData.itunes_id = artistInfo.id;
+    updateData.genres = artistInfo.genres || [];
+    console.log(`   ✅ iTunes update data:`, updateData);
+    // iTunes не предоставляет followers и popularity в том же формате
   }
   
-  await db.update(artists)
-    .set(updateData)
-    .where(eq(artists.id, artistId));
+  try {
+    await db.update(artists)
+      .set(updateData)
+      .where(eq(artists.id, artistId));
+      
+    console.log(`   ✅ Artist ${artistId} updated successfully`);
+  } catch (error) {
+    console.error(`   ❌ Error updating artist ${artistId}:`, error);
+  }
 }
 
 // Check if release already exists
@@ -74,9 +109,9 @@ async function releaseExists(externalId: string, artistId: number, title: string
     .from(releases)
     .where(
       and(
-        eq(releases.artistId, artistId),
+        eq(releases.artist_id, artistId),
         externalId ? 
-          (source === 'deezer' ? eq(releases.deezerId, externalId) : eq(releases.itunesId, externalId))
+          (source === 'deezer' ? eq(releases.deezer_id, externalId) : eq(releases.itunes_id, externalId))
           : eq(releases.title, title)
       )
     )
@@ -87,31 +122,181 @@ async function releaseExists(externalId: string, artistId: number, title: string
 
 // Create release from external album data
 async function createReleaseFromAlbum(album: any, artistId: number, source: 'deezer' | 'itunes') {
+  console.log(`🎵 Creating release: "${album.title}" from ${source}`);
+  console.log(`   Album data:`, JSON.stringify(album, null, 2));
+  
+  // Обрабатываем жанры - преобразуем в правильный формат для JSONB
+  let processedGenres = [];
+  if (album.genres && Array.isArray(album.genres)) {
+    processedGenres = album.genres.map((genre: any) => {
+      if (typeof genre === 'string') {
+        return { name: genre };
+      } else if (genre && typeof genre === 'object') {
+        return {
+          name: genre.name || genre.title || 'Unknown',
+          id: genre.id || null
+        };
+      }
+      return { name: 'Unknown' };
+    });
+  }
+  console.log(`   Processed genres:`, processedGenres);
+  
+  // Обрабатываем участников - преобразуем в правильный формат для JSONB
+  let processedContributors = [];
+  if (album.contributors && Array.isArray(album.contributors)) {
+    processedContributors = album.contributors.map((contributor: any) => {
+      if (typeof contributor === 'string') {
+        return { name: contributor, role: 'contributor' };
+      } else if (contributor && typeof contributor === 'object') {
+        return {
+          name: contributor.name || contributor.title || 'Unknown',
+          role: contributor.role || 'contributor',
+          id: contributor.id || null
+        };
+      }
+      return { name: 'Unknown', role: 'contributor' };
+    });
+  }
+  
   const releaseData: any = {
-    artistId,
+    artist_id: artistId,
     title: album.title,
     type: album.albumType,
-    coverUrl: album.imageUrl,
-    totalTracks: album.trackCount
+    cover_url: album.imageUrl,
+    cover_small: album.coverSmall,
+    cover_medium: album.coverMedium,
+    cover_big: album.coverBig,
+    cover_xl: album.coverXl,
+    total_tracks: album.trackCount,
+    duration: album.duration,
+    explicit_lyrics: album.explicitLyrics || false,
+    explicit_content_lyrics: album.explicitContentLyrics || 0,
+    explicit_content_cover: album.explicitContentCover || 0,
+    genres: processedGenres,
+    upc: album.upc,
+    label: album.label,
+    contributors: processedContributors
   };
   
   if (album.releaseDate) {
-    releaseData.releaseDate = new Date(album.releaseDate);
+    releaseData.release_date = new Date(album.releaseDate);
   }
   
   if (source === 'deezer') {
-    releaseData.deezerId = album.id;
-    releaseData.streamingLinks = {
+    releaseData.deezer_id = album.id;
+    releaseData.streaming_links = {
       deezer: `https://www.deezer.com/album/${album.id}`
     };
   } else if (source === 'itunes') {
-    releaseData.itunesId = album.id;
-    releaseData.streamingLinks = {
+    releaseData.itunes_id = album.id;
+    releaseData.streaming_links = {
       itunes: `https://music.apple.com/album/${album.id}`
     };
   }
   
+  // Добавляем Apple Music ссылку для iTunes релизов
+  if (source === 'itunes' && album.id) {
+    releaseData.streaming_links = {
+      ...releaseData.streaming_links,
+      appleMusic: `https://music.apple.com/album/${album.id}`
+    };
+  }
+  
+  console.log(`   Final release data:`, JSON.stringify(releaseData, null, 2));
+  
   await db.insert(releases).values(releaseData);
+  
+  console.log(`   ✅ Release "${album.title}" created successfully`);
+}
+
+// Update existing release with additional data from another source
+async function updateReleaseWithAdditionalData(existingRelease: any, album: any, source: 'deezer' | 'itunes') {
+  const updateData: any = {};
+  
+  // Добавляем ID от другого сервиса
+  if (source === 'deezer' && !existingRelease.deezer_id) {
+    updateData.deezer_id = album.id;
+    updateData.streaming_links = {
+      ...existingRelease.streaming_links,
+      deezer: `https://www.deezer.com/album/${album.id}`
+    };
+  } else if (source === 'itunes' && !existingRelease.itunes_id) {
+    updateData.itunes_id = album.id;
+    updateData.streaming_links = {
+      ...existingRelease.streaming_links,
+      itunes: `https://music.apple.com/album/${album.id}`,
+      appleMusic: `https://music.apple.com/album/${album.id}`
+    };
+  }
+  
+  // Добавляем недостающие данные
+  if (!existingRelease.cover_small && album.coverSmall) {
+    updateData.cover_small = album.coverSmall;
+  }
+  if (!existingRelease.cover_medium && album.coverMedium) {
+    updateData.cover_medium = album.coverMedium;
+  }
+  if (!existingRelease.cover_big && album.coverBig) {
+    updateData.cover_big = album.coverBig;
+  }
+  if (!existingRelease.cover_xl && album.coverXl) {
+    updateData.cover_xl = album.coverXl;
+  }
+  if (!existingRelease.duration && album.duration) {
+    updateData.duration = album.duration;
+  }
+  if (!existingRelease.upc && album.upc) {
+    updateData.upc = album.upc;
+  }
+  if (!existingRelease.label && album.label) {
+    updateData.label = album.label;
+  }
+  
+  // Обновляем жанры, если их нет или мало
+  if ((!existingRelease.genres || existingRelease.genres.length === 0) && album.genres) {
+    let processedGenres = [];
+    if (Array.isArray(album.genres)) {
+      processedGenres = album.genres.map((genre: any) => {
+        if (typeof genre === 'string') {
+          return { name: genre };
+        } else if (genre && typeof genre === 'object') {
+          return {
+            name: genre.name || genre.title || 'Unknown',
+            id: genre.id || null
+          };
+        }
+        return { name: 'Unknown' };
+      });
+    }
+    updateData.genres = processedGenres;
+  }
+  
+  // Обновляем участников, если их нет
+  if ((!existingRelease.contributors || existingRelease.contributors.length === 0) && album.contributors) {
+    let processedContributors = [];
+    if (Array.isArray(album.contributors)) {
+      processedContributors = album.contributors.map((contributor: any) => {
+        if (typeof contributor === 'string') {
+          return { name: contributor, role: 'contributor' };
+        } else if (contributor && typeof contributor === 'object') {
+          return {
+            name: contributor.name || contributor.title || 'Unknown',
+            role: contributor.role || 'contributor',
+            id: contributor.id || null
+          };
+        }
+        return { name: 'Unknown', role: 'contributor' };
+      });
+    }
+    updateData.contributors = processedContributors;
+  }
+  
+  if (Object.keys(updateData).length > 0) {
+    await db.update(releases)
+      .set(updateData)
+      .where(eq(releases.id, existingRelease.id));
+  }
 }
 
 // Get cached discography for artist
@@ -119,12 +304,12 @@ async function getCachedDiscography(artistId: number, source: 'deezer' | 'itunes
   const cached = await db.select()
     .from(discographyCache)
     .where(and(
-      eq(discographyCache.artistId, artistId),
+      eq(discographyCache.artist_id, artistId),
       eq(discographyCache.source, source)
     ))
     .limit(1);
     
-  return cached.length > 0 ? cached[0].albumIds : null;
+  return cached.length > 0 ? cached[0].album_ids : null;
 }
 
 // Update discography cache for artist
@@ -132,21 +317,21 @@ async function updateDiscographyCache(artistId: number, source: 'deezer' | 'itun
   // Delete existing cache
   await db.delete(discographyCache)
     .where(and(
-      eq(discographyCache.artistId, artistId),
+      eq(discographyCache.artist_id, artistId),
       eq(discographyCache.source, source)
     ));
     
   // Insert new cache
   await db.insert(discographyCache).values({
-    artistId,
+    artist_id: artistId,
     source,
-    albumIds,
-    lastUpdated: new Date()
+    album_ids: albumIds,
+    last_updated: new Date()
   });
 }
 
 // Process a single artist: find in combined music APIs and import discography
-async function processArtist(artistName: string): Promise<{
+export async function processArtist(artistName: string): Promise<{
   newReleases: number;
   skippedReleases: number;
   error?: string;
@@ -162,7 +347,17 @@ async function processArtist(artistName: string): Promise<{
       return { newReleases: 0, skippedReleases: 0, error: `Not found in music services` };
     }
     
+    console.log(`🔍 DEBUG: musicResult:`, JSON.stringify(musicResult, null, 2));
+    
     const { artist, albums } = musicResult;
+    
+    console.log(`🔍 DEBUG: artist после деструктуризации:`, JSON.stringify(artist, null, 2));
+    console.log(`🔍 DEBUG: albums после деструктуризации:`, JSON.stringify(albums, null, 2));
+    
+    if (!artist) {
+      console.log(`❌ Artist data is missing from musicResult`);
+      return { newReleases: 0, skippedReleases: 0, error: `Artist data is missing` };
+    }
     
     console.log(`✅ Found artist: ${artist.name} (${artist.source}, ID: ${artist.id})`);
     
@@ -176,7 +371,7 @@ async function processArtist(artistName: string): Promise<{
     
     // Check if we have existing artist to optimize with caching
     const isExistingArtist = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
-    const isUpdate = isExistingArtist.length > 0 && isExistingArtist[0].lastUpdated;
+    const isUpdate = isExistingArtist.length > 0 && isExistingArtist[0].last_updated;
     
     let newReleases = 0;
     let skippedReleases = 0;
@@ -233,6 +428,149 @@ async function processArtist(artistName: string): Promise<{
   }
 }
 
+// Import discography for an artist
+async function importDiscography(artistId: number, musicResult: any): Promise<{
+  newReleases: number;
+  skippedReleases: number;
+  error?: string;
+}> {
+  try {
+    const { artist, albums } = musicResult;
+    
+    console.log(`📀 Found ${albums.length} releases for ${artist.name}`);
+    
+    // Check if we have existing artist to optimize with caching
+    const isExistingArtist = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
+    const isUpdate = isExistingArtist.length > 0 && isExistingArtist[0].last_updated;
+    
+    let newReleases = 0;
+    let skippedReleases = 0;
+    let albumsToProcess = albums;
+    
+    if (isUpdate) {
+      console.log(`🔄 Updating artist: ${artist.name}`);
+      
+      // Get cached discography
+      const cachedAlbumIds = await getCachedDiscography(artistId, artist.source);
+      
+      if (cachedAlbumIds && cachedAlbumIds.length > 0) {
+        // Filter only new albums that weren't in the cache
+        const currentAlbumIds = albums.map(album => album.id);
+        const newAlbumIds = currentAlbumIds.filter(id => !cachedAlbumIds.includes(id));
+        
+        albumsToProcess = albums.filter(album => newAlbumIds.includes(album.id));
+        skippedReleases = albums.length - albumsToProcess.length;
+        
+        console.log(`💾 Cache optimization: ${albumsToProcess.length} new albums, ${skippedReleases} cached`);
+      }
+    }
+    
+    // Process albums (either all for new artists, or only new ones for existing)
+    for (const album of albumsToProcess) {
+      // Double-check if release already exists (safety net)
+      if (await releaseExists(album.id, artistId, album.title, album.source)) {
+        skippedReleases++;
+        continue;
+      }
+      
+      // Create new release
+      const releaseData = {
+        artist_id: artistId,
+        title: album.title,
+        release_date: album.releaseDate ? new Date(album.releaseDate) : null,
+        cover_url: album.imageUrl || null,
+        streaming_links: {
+          deezer: album.source === 'deezer' ? `https://deezer.com/album/${album.id}` : null,
+          itunes: album.source === 'itunes' ? `https://music.apple.com/album/${album.id}` : null,
+        },
+        deezer_id: album.source === 'deezer' ? album.id : null,
+        itunes_id: album.source === 'itunes' ? album.id : null,
+        type: album.albumType || 'album',
+        total_tracks: album.trackCount || null,
+        is_test_data: false,
+      };
+      
+      await db.insert(releases).values(releaseData);
+      newReleases++;
+    }
+    
+    // Update cache with all processed album IDs
+    await updateDiscographyCache(artistId, artist.source, albums.map(album => album.id));
+    
+    // Update artist's last updated timestamp
+    await db.update(artists)
+      .set({ last_updated: new Date() })
+      .where(eq(artists.id, artistId));
+    
+    console.log(`✅ Imported ${newReleases} new releases for ${artist.name} (${skippedReleases} skipped)`);
+    
+    return {
+      newReleases,
+      skippedReleases,
+    };
+    
+  } catch (error) {
+    console.error(`❌ Error importing discography for artist ${artistId}:`, error);
+    return {
+      newReleases: 0,
+      skippedReleases: 0,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
+// Process a single artist with MTS Music ID
+async function processArtistWithMtsId(artistName: string, mtsId: string): Promise<{
+  newReleases: number;
+  skippedReleases: number;
+  error?: string;
+}> {
+  try {
+    console.log(`🎵 Processing artist: ${artistName} (MTS ID: ${mtsId})`);
+    
+    // Create or update artist in database with MTS ID
+    const artistId = await findOrCreateArtist(artistName, 'mts', mtsId);
+    
+    // Search for artist using combined API (Deezer + iTunes fallback)
+    const musicResult = await musicAPI.findArtist(artistName);
+    
+    if (!musicResult) {
+      return {
+        newReleases: 0,
+        skippedReleases: 0,
+        error: `Artist not found in music APIs`
+      };
+    }
+    
+    console.log(`✅ Found artist: ${musicResult.name} (Deezer: ${musicResult.deezerId}, iTunes: ${musicResult.itunesId})`);
+    
+    // Update with external music service IDs
+    if (musicResult.deezerId) {
+      await updateArtistWithMusicInfo(artistId, 'deezer', musicResult.deezerId);
+    }
+    if (musicResult.itunesId) {
+      await updateArtistWithMusicInfo(artistId, 'itunes', musicResult.itunesId);
+    }
+    
+    // Import discography
+    const discographyResult = await importDiscography(artistId, musicResult);
+    
+    return {
+      newReleases: discographyResult.newReleases,
+      skippedReleases: discographyResult.skippedReleases,
+      error: discographyResult.error
+    };
+    
+  } catch (error) {
+    console.error(`❌ Error processing artist ${artistName}:`, error);
+    return {
+      newReleases: 0,
+      skippedReleases: 0,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+}
+
 // Import music from a single Russian music playlist (MTS Music, etc.)
 export async function importFromRussianPlaylist(playlistUrl: string): Promise<ImportStats> {
   const stats: ImportStats = {
@@ -257,9 +595,30 @@ export async function importFromRussianPlaylist(playlistUrl: string): Promise<Im
     console.log(`📋 Parsed playlist "${playlistResult.name}" with ${playlistResult.tracks.length} tracks`);
     console.log(`👨‍🎤 Found ${playlistResult.uniqueArtists.length} unique artists`);
     
-    // Process each unique artist
-    for (const artistName of playlistResult.uniqueArtists) {
-      const result = await processArtist(artistName);
+    // Process each track to extract artists with MTS IDs
+    const artistsToProcess = new Map<string, string>(); // name -> mtsId
+    
+    for (const track of playlistResult.tracks) {
+      if (track.artists && track.artists.length > 0) {
+        // Use the new structure with MTS IDs
+        for (const artist of track.artists) {
+          if (artist.name && !artistsToProcess.has(artist.name)) {
+            artistsToProcess.set(artist.name, artist.mtsId || '');
+          }
+        }
+      } else {
+        // Fallback to old structure
+        if (track.artist && !artistsToProcess.has(track.artist)) {
+          artistsToProcess.set(track.artist, track.artistMtsId || '');
+        }
+      }
+    }
+    
+    console.log(`👨‍🎤 Processing ${artistsToProcess.size} artists with MTS IDs`);
+    
+    // Process each artist
+    for (const [artistName, mtsId] of artistsToProcess.entries()) {
+      const result = await processArtistWithMtsId(artistName, mtsId);
       
       stats.newReleases += result.newReleases;
       stats.skippedReleases += result.skippedReleases;

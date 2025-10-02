@@ -9,6 +9,8 @@ export interface ParsedTrack {
   artist: string;
   title: string;
   position?: number;
+  artistMtsId?: string; // ID артиста в MTS Music
+  artists?: Array<{ name: string; mtsId?: string }>; // Множественные артисты
 }
 
 export interface PlaylistParseResult {
@@ -48,18 +50,28 @@ abstract class RussianMusicParser {
     const artistSet = new Set<string>();
     
     for (const track of tracks) {
-      const cleanedArtist = this.cleanArtistName(track.artist);
-      
-      if (cleanedArtist && cleanedArtist.length > 1) {
-        artistSet.add(cleanedArtist);
-        
-        // Обрабатываем коллаборации (feat, &, ,)
-        const collaborators = this.extractCollaborators(cleanedArtist);
-        collaborators.forEach(collaborator => {
-          if (collaborator.length > 1) {
-            artistSet.add(collaborator);
+      // Если есть массив artists, используем его
+      if (track.artists && track.artists.length > 0) {
+        track.artists.forEach(artist => {
+          if (artist.name && artist.name.length > 1) {
+            artistSet.add(artist.name);
           }
         });
+      } else {
+        // Иначе используем старый способ
+        const cleanedArtist = this.cleanArtistName(track.artist);
+        
+        if (cleanedArtist && cleanedArtist.length > 1) {
+          artistSet.add(cleanedArtist);
+          
+          // Обрабатываем коллаборации (feat, &, ,)
+          const collaborators = this.extractCollaborators(cleanedArtist);
+          collaborators.forEach(collaborator => {
+            if (collaborator.length > 1) {
+              artistSet.add(collaborator);
+            }
+          });
+        }
       }
     }
     
@@ -67,7 +79,7 @@ abstract class RussianMusicParser {
   }
   
   // Извлечение коллабораторов из имени артиста
-  private extractCollaborators(artistName: string): string[] {
+  protected extractCollaborators(artistName: string): string[] {
     const separators = [' feat. ', ' feat ', ' ft. ', ' ft ', ' & ', ', ', ' x ', ' X '];
     let artists = [artistName];
     
@@ -78,6 +90,55 @@ abstract class RussianMusicParser {
     }
     
     return artists.filter(artist => artist && artist.length > 1);
+  }
+  
+  // Извлечение MTS Music ID из URL
+  protected extractMtsIdFromUrl(url: string): string {
+    const match = url.match(/\/artist\/(\d+)/);
+    return match ? match[1] : '';
+  }
+  
+  // Сопоставление имен артистов с MTS ID из ссылок
+  protected matchArtistsWithMtsIds(
+    collaborators: string[], 
+    artistElement: cheerio.Cheerio<any>, 
+    $: cheerio.CheerioAPI
+  ): Array<{ name: string; mtsId?: string }> {
+    const artists: Array<{ name: string; mtsId?: string }> = [];
+    
+    // Ищем все ссылки в элементе артиста
+    const artistLinks = artistElement.find('a');
+    const linkData: Array<{ text: string; mtsId: string }> = [];
+    
+    artistLinks.each((_, link) => {
+      const linkElement = $(link);
+      const href = linkElement.attr('href');
+      const text = linkElement.text().trim();
+      
+      if (href && text) {
+        const mtsId = this.extractMtsIdFromUrl(href);
+        if (mtsId) {
+          linkData.push({ text: this.cleanArtistName(text), mtsId });
+        }
+      }
+    });
+    
+    // Сопоставляем имена артистов с найденными ссылками
+    for (const collaborator of collaborators) {
+      const cleanName = this.cleanArtistName(collaborator);
+      const matchingLink = linkData.find(link => 
+        link.text.toLowerCase() === cleanName.toLowerCase() ||
+        link.text.toLowerCase().includes(cleanName.toLowerCase()) ||
+        cleanName.toLowerCase().includes(link.text.toLowerCase())
+      );
+      
+      artists.push({
+        name: cleanName,
+        mtsId: matchingLink?.mtsId || ''
+      });
+    }
+    
+    return artists;
   }
   
   abstract parsePlaylist(url: string): Promise<PlaylistParseResult>;
@@ -257,12 +318,34 @@ export class MTSMusicParser extends RussianMusicParser {
       
       let artist = '';
       let title = '';
+      let artistMtsId = '';
+      let artists: Array<{ name: string; mtsId?: string }> = [];
       
-      // Ищем артиста
+      // Ищем артиста с ссылками
       for (const selector of artistSelectors) {
         const artistElement = element.find(selector).first();
         if (artistElement.length > 0) {
           artist = artistElement.text().trim();
+          
+          // Ищем все ссылки на артистов в этом элементе
+          const artistLinks = artistElement.find('a');
+          const artistMtsIds: string[] = [];
+          
+          artistLinks.each((_, link) => {
+            const href = $(link).attr('href');
+            if (href) {
+              const mtsId = this.extractMtsIdFromUrl(href);
+              if (mtsId) {
+                artistMtsIds.push(mtsId);
+              }
+            }
+          });
+          
+          // Если есть ссылки, используем первую как основную
+          if (artistMtsIds.length > 0) {
+            artistMtsId = artistMtsIds[0];
+          }
+          
           break;
         }
       }
@@ -297,10 +380,35 @@ export class MTSMusicParser extends RussianMusicParser {
       }
       
       if (artist && title) {
+        // Обрабатываем множественных артистов
+        const collaborators = this.extractCollaborators(artist);
+        if (collaborators.length > 1) {
+          // Пытаемся сопоставить имена артистов с MTS ID
+          // Находим элемент артиста заново для сопоставления
+          let artistElementForMatching: cheerio.Cheerio<any> | null = null;
+          for (const selector of artistSelectors) {
+            const foundElement = element.find(selector).first();
+            if (foundElement.length > 0) {
+              artistElementForMatching = foundElement;
+              break;
+            }
+          }
+          
+          if (artistElementForMatching) {
+            artists = this.matchArtistsWithMtsIds(collaborators, artistElementForMatching, $);
+          } else {
+            artists = collaborators.map(name => ({ name: this.cleanArtistName(name) }));
+          }
+        } else {
+          artists = [{ name: this.cleanArtistName(artist), mtsId: artistMtsId }];
+        }
+        
         return {
           artist: this.cleanArtistName(artist),
           title: title.trim(),
-          position
+          position,
+          artistMtsId,
+          artists
         };
       }
       

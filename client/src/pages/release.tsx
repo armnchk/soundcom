@@ -33,7 +33,9 @@ export default function Release() {
   });
 
   useEffect(() => {
-    if (isAuthenticated && !authLoading && user && !user.nickname) {
+    // Показываем модальное окно только если пользователь авторизован, но у него нет nickname
+    // и это не первый заход (чтобы избежать показа для существующих пользователей)
+    if (isAuthenticated && !authLoading && user && !user.nickname && !localStorage.getItem('nicknameModalShown')) {
       setShowNicknameModal(true);
     }
   }, [isAuthenticated, authLoading, user]);
@@ -68,7 +70,7 @@ export default function Release() {
     );
   }
 
-  const streamingLinks = release.streamingLinks as { spotify?: string; appleMusic?: string } || {};
+  const streamingLinks = release.streamingLinks as { appleMusic?: string } || {};
 
   return (
     <div className="min-h-screen bg-background">
@@ -120,23 +122,10 @@ export default function Release() {
               </div>
 
               {/* Streaming Links */}
-              {(streamingLinks.spotify || streamingLinks.appleMusic) && (
+              {streamingLinks.appleMusic && (
                 <div className="space-y-2">
                   <h3 className="text-sm font-semibold text-foreground">Слушать на</h3>
                   <div className="flex flex-wrap gap-2">
-                    {streamingLinks.spotify && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        asChild
-                        data-testid="link-spotify"
-                      >
-                        <a href={streamingLinks.spotify} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                          Spotify
-                        </a>
-                      </Button>
-                    )}
                     {streamingLinks.appleMusic && (
                       <Button
                         variant="secondary"

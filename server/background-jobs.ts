@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { db } from './db';
-import { importJobs, InsertImportJob, releases, artists } from '@shared/schema';
+import { importJobs, InsertImportJob, releases, artists, autoImportPlaylists } from '@shared/schema';
 import { importFromRussianPlaylist } from './music-importer';
 import { musicAPI } from './combined-music-api';
 
@@ -24,9 +24,8 @@ export async function getImportJob(jobId: number) {
   return job[0] || null;
 }
 
-export async function getAllImportJobs(userId: string) {
+export async function getAllImportJobs(userId?: string) {
   return await db.select().from(importJobs)
-    .where(sql`created_by = ${userId}`)
     .orderBy(sql`created_at DESC`)
     .limit(20);
 }
@@ -118,9 +117,15 @@ async function processImportJob(jobId: number) {
       console.log(`📊 Job ${jobId} progress: ${progress}% (${stats.processedArtists}/${stats.totalArtists} artists)`);
     };
     
+    // Get playlist URL by ID
+    const playlist = await db.select().from(autoImportPlaylists).where(sql`id = ${job.playlist_id}`).limit(1);
+    if (!playlist[0]) {
+      throw new Error(`Playlist with ID ${job.playlist_id} not found`);
+    }
+    
     // Run the import with progress tracking
-    console.log(`🎵 Processing playlist: ${job.playlistUrl}`);
-    const result = await importFromRussianPlaylist(job.playlistUrl);
+    console.log(`🎵 Processing playlist: ${playlist[0].url}`);
+    const result = await importFromRussianPlaylist(playlist[0].url);
     
     // Final update
     await updateJobStatus(jobId, 'completed', undefined, {

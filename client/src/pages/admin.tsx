@@ -14,20 +14,18 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 
 export default function Admin() {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'releases' | 'reports' | 'users' | 'import' | 'browse' | 'collections' | 'music-import' | 'playlists' | 'import-logs'>('releases');
+  const [activeTab, setActiveTab] = useState<'releases' | 'reports' | 'users' | 'browse' | 'collections' | 'playlists' | 'import-music' | 'import-logs'>('releases');
   const [releaseForm, setReleaseForm] = useState({
     title: '',
     artistName: '',
     releaseDate: '',
     coverUrl: '',
-    spotifyUrl: '',
     appleMusicUrl: ''
   });
   const [showTestData, setShowTestData] = useState(() => {
@@ -80,7 +78,6 @@ export default function Admin() {
         releaseDate: new Date(data.releaseDate).toISOString(),
         coverUrl: data.coverUrl || null,
         streamingLinks: {
-          spotify: data.spotifyUrl || null,
           appleMusic: data.appleMusicUrl || null
         }
       };
@@ -95,7 +92,6 @@ export default function Admin() {
         artistName: '',
         releaseDate: '',
         coverUrl: '',
-        spotifyUrl: '',
         appleMusicUrl: ''
       });
       queryClient.invalidateQueries({ queryKey: ["/api/releases"] });
@@ -182,13 +178,6 @@ export default function Admin() {
             User Management
           </Button>
           <Button
-            variant={activeTab === 'import' ? 'default' : 'secondary'}
-            onClick={() => setActiveTab('import')}
-            data-testid="tab-import"
-          >
-            Импорт релизов
-          </Button>
-          <Button
             variant={activeTab === 'collections' ? 'default' : 'secondary'}
             onClick={() => setActiveTab('collections')}
             data-testid="tab-collections"
@@ -204,6 +193,14 @@ export default function Admin() {
           >
             <List className="w-4 h-4 mr-2" />
             Плейлисты
+          </Button>
+          <Button
+            variant={activeTab === 'import-music' ? 'default' : 'secondary'}
+            onClick={() => setActiveTab('import-music')}
+            data-testid="tab-import-music"
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Импорт музыки
           </Button>
           <Button
             variant={activeTab === 'import-logs' ? 'default' : 'secondary'}
@@ -287,16 +284,6 @@ export default function Admin() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="spotifyUrl">Spotify URL</Label>
-                  <Input
-                    id="spotifyUrl"
-                    placeholder="https://open.spotify.com/album/..."
-                    value={releaseForm.spotifyUrl}
-                    onChange={(e) => setReleaseForm(prev => ({ ...prev, spotifyUrl: e.target.value }))}
-                    data-testid="input-spotify-url"
-                  />
-                </div>
-                <div>
                   <Label htmlFor="appleMusicUrl">Apple Music URL</Label>
                   <Input
                     id="appleMusicUrl"
@@ -330,10 +317,6 @@ export default function Admin() {
           <UserManagementTab />
         )}
 
-        {/* Import Tab */}
-        {activeTab === 'import' && (
-          <MusicImportTab />
-        )}
 
         {/* Browse Releases Tab */}
         {activeTab === 'browse' && (
@@ -354,6 +337,11 @@ export default function Admin() {
         {/* Playlists Tab */}
         {activeTab === 'playlists' && (
           <PlaylistsTab />
+        )}
+
+        {/* Import Music Tab */}
+        {activeTab === 'import-music' && (
+          <YandexMusicImportTab />
         )}
 
         {/* Import Logs Tab */}
@@ -439,10 +427,10 @@ function YandexMusicImportTab() {
       return;
     }
 
-    if (!playlistUrl.includes('music.mts.ru') && !playlistUrl.includes('music.yandex.ru')) {
+    if (!playlistUrl.includes('music.mts.ru')) {
       toast({
         title: "Ошибка",
-        description: "Пожалуйста, введите корректную ссылку на плейлист (MTS Music или Яндекс Музыка)",
+        description: "Пожалуйста, введите корректную ссылку на плейлист MTS Music",
         variant: "destructive",
       });
       return;
@@ -453,10 +441,8 @@ function YandexMusicImportTab() {
 
   const predefinedPlaylists = [
     { name: "🔥 MTS Чарт", url: "https://music.mts.ru/chart" },
-    { name: "Чарт Яндекс", url: "https://music.yandex.ru/chart" },
-    { name: "Новые релизы", url: "https://music.yandex.ru/playlists/2111e2b6-587d-a600-2fea-54df7c314477" },
-    { name: "Indie Rock", url: "https://music.yandex.ru/playlists/3c5d7e75-c8ea-55af-9689-2263608117ba" },
-    { name: "Russian Hip-Hop", url: "https://music.yandex.ru/playlists/83d59684-4c03-783a-8a27-8a04d52edb95" }
+    { name: "MTS Хиты", url: "https://music.mts.ru/playlist/11184076" },
+    { name: "MTS Новинки", url: "https://music.mts.ru/playlist/11184077" }
   ];
 
   return (
@@ -466,9 +452,9 @@ function YandexMusicImportTab() {
           <div className="flex items-center gap-3 mb-6">
             <Download className="w-6 h-6 text-primary" />
             <div>
-              <h3 className="text-xl font-semibold text-white">Импорт музыки из российских сервисов</h3>
+              <h3 className="text-xl font-semibold text-white">Импорт музыки из MTS Music</h3>
               <p className="text-white/70 text-sm">
-                Автоматический импорт релизов через Deezer/iTunes API на основе плейлистов MTS Music и Яндекс Музыки
+                Автоматический импорт релизов через Deezer/iTunes API на основе плейлистов MTS Music
               </p>
             </div>
           </div>
@@ -485,8 +471,8 @@ function YandexMusicImportTab() {
                 <div className="text-sm text-white/70">Всего релизов</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-primary">{importStats.artistsWithSpotify || 0}</div>
-                <div className="text-sm text-white/70">С Spotify</div>
+                <div className="text-2xl font-bold text-primary">{importStats.artistsWithDeezer || 0}</div>
+                <div className="text-sm text-white/70">С Deezer</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary">{importStats.recentReleases || 0}</div>
@@ -498,11 +484,11 @@ function YandexMusicImportTab() {
           {/* Test Import Section */}
           <div className="space-y-4">
             <div>
-              <Label htmlFor="playlist-url" className="text-white">URL плейлиста (MTS Music или Яндекс Музыка)</Label>
+              <Label htmlFor="playlist-url" className="text-white">URL плейлиста MTS Music</Label>
               <div className="flex gap-2 mt-1">
                 <Input
                   id="playlist-url"
-                  placeholder="https://music.mts.ru/chart или https://music.yandex.ru/playlists/..."
+                  placeholder="https://music.mts.ru/chart или https://music.mts.ru/playlist/..."
                   value={playlistUrl}
                   onChange={(e) => setPlaylistUrl(e.target.value)}
                   className="text-white"
@@ -552,11 +538,11 @@ function YandexMusicImportTab() {
             <AlertDescription className="text-white/80">
               <strong>Как работает импорт:</strong>
               <br />
-              1. Парсим плейлист Яндекс Музыки для получения списка артистов
+              1. Парсим плейлист MTS Music для получения списка артистов
               <br />
-              2. Ищем каждого артиста в Spotify по имени  
+              2. Ищем каждого артиста в Deezer и iTunes по имени  
               <br />
-              3. Загружаем полную дискографию артиста через Spotify API
+              3. Загружаем полную дискографию артиста через Deezer/iTunes API
               <br />
               4. Сохраняем все релизы (альбомы, синглы, компиляции) в базу данных
             </AlertDescription>
@@ -1193,152 +1179,6 @@ function UserManagementTab() {
   );
 }
 
-// Music Import Tab Component
-function MusicImportTab() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [importMode, setImportMode] = useState<'artists' | 'years'>('artists');
-  const [artistList, setArtistList] = useState('');
-  const [yearsList, setYearsList] = useState('');
-
-  const { data: stats } = useQuery({
-    queryKey: ["/api/admin/import/stats"],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/admin/import/stats');
-      return response.json();
-    },
-  });
-
-  const importMutation = useMutation({
-    mutationFn: async (data: { artists?: string[]; years?: number[] }) => {
-      if (data.artists) {
-        const response = await apiRequest('POST', '/api/admin/import', { artists: data.artists });
-        return response.json();
-      } else if (data.years) {
-        const response = await apiRequest('POST', '/api/admin/import/years', { years: data.years });
-        return response.json();
-      }
-      throw new Error('Invalid import data');
-    },
-    onSuccess: (result) => {
-      toast({
-        title: "Импорт завершен!",
-        description: `✅ Добавлено: ${result.success || 0} релизов`,
-      });
-      setArtistList('');
-      setYearsList('');
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/import/stats"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/releases"] });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Ошибка импорта",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleImport = () => {
-    if (importMode === 'artists') {
-      const artists = artistList.split('\n').filter(name => name.trim());
-      if (artists.length === 0) {
-        toast({ title: "Список пуст", variant: "destructive" });
-        return;
-      }
-      importMutation.mutate({ artists });
-    } else {
-      const years = yearsList.split('\n').map(y => parseInt(y.trim())).filter(y => !isNaN(y));
-      if (years.length === 0) {
-        toast({ title: "Список пуст", variant: "destructive" });
-        return;
-      }
-      importMutation.mutate({ years });
-    }
-  };
-
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <Upload className="w-6 h-6 text-primary" />
-          <div>
-            <h3 className="text-xl font-semibold text-white">Массовый импорт релизов</h3>
-            <p className="text-white/70 text-sm">Импорт через Last.fm API</p>
-          </div>
-        </div>
-
-        {stats && (
-          <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-muted/20 rounded-lg">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{stats.totalReleases || 0}</div>
-              <div className="text-sm text-white/70">Всего релизов</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{stats.totalArtists || 0}</div>
-              <div className="text-sm text-white/70">Всего артистов</div>
-            </div>
-          </div>
-        )}
-
-        <div className="space-y-4">
-          <RadioGroup value={importMode} onValueChange={(value: 'artists' | 'years') => setImportMode(value)}>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="artists" id="artists" />
-              <Label htmlFor="artists" className="text-white">По артистам</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="years" id="years" />
-              <Label htmlFor="years" className="text-white">По годам</Label>
-            </div>
-          </RadioGroup>
-
-          {importMode === 'artists' ? (
-            <div>
-              <Label className="text-white">Список артистов (по одному на строку):</Label>
-              <Textarea
-                placeholder="Arctic Monkeys&#10;Radiohead&#10;..."
-                value={artistList}
-                onChange={(e) => setArtistList(e.target.value)}
-                rows={6}
-                className="text-white"
-              />
-            </div>
-          ) : (
-            <div>
-              <Label className="text-white">Список годов (по одному на строку):</Label>
-              <Textarea
-                placeholder="2023&#10;2022&#10;..."
-                value={yearsList}
-                onChange={(e) => setYearsList(e.target.value)}
-                rows={6}
-                className="text-white"
-              />
-            </div>
-          )}
-
-          <Button
-            onClick={handleImport}
-            disabled={importMutation.isPending}
-            className="w-full"
-          >
-            {importMutation.isPending ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                Импорт...
-              </div>
-            ) : (
-              <>
-                <Upload className="w-4 h-4 mr-2" />
-                Начать импорт
-              </>
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 // Release Browser Tab Component  
 function ReleaseBrowserTab({ searchQuery, onSearchChange, showTestData }: { 
@@ -1434,14 +1274,17 @@ function CollectionsTab() {
     queryKey: ["/api/releases", { showTestData: true }],
     queryFn: async () => {
       const response = await fetch('/api/releases?showTestData=true');
+      if (!response.ok) {
+        throw new Error('Failed to fetch releases');
+      }
       return response.json();
     },
   });
 
-  const filteredReleases = allReleases.filter((release: any) =>
+  const filteredReleases = Array.isArray(allReleases) ? allReleases.filter((release: any) =>
     release.title.toLowerCase().includes(releaseSearch.toLowerCase()) ||
     release.artist?.name.toLowerCase().includes(releaseSearch.toLowerCase())
-  );
+  ) : [];
 
   const createCollectionMutation = useMutation({
     mutationFn: async (data: typeof newCollection) => {
@@ -1670,6 +1513,7 @@ function PlaylistsTab() {
   const [playlistForm, setPlaylistForm] = useState({
     name: '',
     url: '',
+    platform: 'mts',
     enabled: true,
     sortOrder: 0
   });
@@ -1687,7 +1531,7 @@ function PlaylistsTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auto-import-playlists"] });
-      setPlaylistForm({ name: '', url: '', enabled: true, sortOrder: 0 });
+      setPlaylistForm({ name: '', url: '', platform: 'mts', enabled: true, sortOrder: 0 });
       toast({
         title: "Плейлист добавлен",
         description: "Новый плейлист успешно добавлен в автоимпорт.",
@@ -1819,6 +1663,23 @@ function PlaylistsTab() {
                 />
               </div>
               
+              <div>
+                <Label htmlFor="playlist-platform" className="text-white">
+                  Платформа
+                </Label>
+                <select
+                  id="playlist-platform"
+                  value={playlistForm.platform}
+                  onChange={(e) => setPlaylistForm({ ...playlistForm, platform: e.target.value })}
+                  className="w-full px-3 py-2 bg-muted text-white rounded-md border border-input"
+                  data-testid="select-playlist-platform"
+                >
+                  <option value="mts">MTS Music</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <Label htmlFor="playlist-url" className="text-white">
                   URL плейлиста

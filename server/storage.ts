@@ -51,7 +51,7 @@ export interface IStorage {
   // Release operations
   getReleases(filters?: { genre?: string; year?: number; artistId?: number }): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number })[]>;
   getRelease(id: number): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number }) | undefined>;
-  getReleaseByTitleAndArtist(title: string, artistId: number): Promise<Release | undefined>;
+  getReleaseByTitleAndArtist(title: string, artist_id: number): Promise<Release | undefined>;
   createRelease(release: InsertRelease): Promise<Release>;
   updateRelease(id: number, release: Partial<InsertRelease>): Promise<Release>;
   deleteRelease(id: number): Promise<void>;
@@ -59,12 +59,12 @@ export interface IStorage {
   searchArtists(query: string): Promise<(Artist & { latestReleaseCover?: string })[]>;
   
   // Rating operations
-  getRating(userId: string, releaseId: number): Promise<Rating | undefined>;
+  getRating(user_id: string, release_id: number): Promise<Rating | undefined>;
   upsertRating(rating: InsertRating): Promise<Rating>;
-  getReleaseRatings(releaseId: number): Promise<{ averageRating: number; count: number }>;
+  getReleaseRatings(release_id: number): Promise<{ averageRating: number; count: number }>;
   
   // Comment operations
-  getComments(releaseId: number, sortBy?: 'date' | 'rating' | 'likes'): Promise<(Comment & { 
+  getComments(release_id: number, sortBy?: 'date' | 'rating' | 'likes'): Promise<(Comment & { 
     user: Pick<User, 'id' | 'nickname' | 'profileImageUrl'> | null;
     likeCount: number;
     dislikeCount: number;
@@ -76,7 +76,7 @@ export interface IStorage {
   
   // Comment reaction operations
   upsertCommentReaction(reaction: InsertCommentReaction): Promise<CommentReaction>;
-  deleteCommentReaction(commentId: number, userId: string): Promise<void>;
+  deleteCommentReaction(commentId: number, user_id: string): Promise<void>;
   
   // Report operations
   createReport(report: InsertReport): Promise<Report>;
@@ -84,8 +84,8 @@ export interface IStorage {
   updateReportStatus(id: number, status: string): Promise<Report>;
   
   // User profile operations
-  getUserRatings(userId: string): Promise<(Rating & { release: Release & { artist: Artist } })[]>;
-  getUserComments(userId: string): Promise<(Comment & { release: Release & { artist: Artist } })[]>;
+  getUserRatings(user_id: string): Promise<(Rating & { release: Release & { artist: Artist } })[]>;
+  getUserComments(user_id: string): Promise<(Comment & { release: Release & { artist: Artist } })[]>;
   
   // Collection operations
   getCollections(activeOnly?: boolean): Promise<(Collection & { releases: (Release & { artist: Artist })[] })[]>;
@@ -93,17 +93,10 @@ export interface IStorage {
   createCollection(collection: InsertCollection): Promise<Collection>;
   updateCollection(id: number, collection: Partial<InsertCollection>): Promise<Collection>;
   deleteCollection(id: number): Promise<void>;
-  addReleaseToCollection(collectionId: number, releaseId: number, sortOrder?: number): Promise<CollectionRelease>;
-  removeReleaseFromCollection(collectionId: number, releaseId: number): Promise<void>;
-  updateCollectionReleaseSortOrder(collectionId: number, releaseId: number, sortOrder: number): Promise<void>;
+  addReleaseToCollection(collectionId: number, release_id: number, sortOrder?: number): Promise<CollectionRelease>;
+  removeReleaseFromCollection(collectionId: number, release_id: number): Promise<void>;
+  updateCollectionReleaseSortOrder(collectionId: number, release_id: number, sort_order: number): Promise<void>;
   
-  // Import statistics operations
-  getImportStats(): Promise<{
-    totalArtists: number;
-    totalReleases: number;
-    artistsWithSpotify: number;
-    recentReleases: number;
-  }>;
   
   // Auto Import Playlists operations
   getAutoImportPlaylists(): Promise<SelectAutoImportPlaylist[]>;
@@ -121,7 +114,14 @@ export interface IStorage {
 export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    // Сначала пытаемся найти по google_id (для Google OAuth)
+    let [user] = await db.select().from(users).where(eq(users.google_id, id));
+    
+    // Если не найден по google_id, ищем по обычному id (для совместимости)
+    if (!user) {
+      [user] = await db.select().from(users).where(eq(users.id, id));
+    }
+    
     return user;
   }
 
@@ -133,7 +133,7 @@ export class DatabaseStorage implements IStorage {
         target: users.id,
         set: {
           ...userData,
-          updatedAt: new Date(),
+          updated_at: new Date(),
         },
       })
       .returning();
@@ -143,7 +143,7 @@ export class DatabaseStorage implements IStorage {
   async updateUserNickname(id: string, nickname: string): Promise<User> {
     const [user] = await db
       .update(users)
-      .set({ nickname, updatedAt: new Date() })
+      .set({ nickname, updated_at: new Date() })
       .where(eq(users.id, id))
       .returning();
     return user;
@@ -175,46 +175,46 @@ export class DatabaseStorage implements IStorage {
     
     // По умолчанию скрываем тестовые данные
     if (!filters?.includeTestData) {
-      whereConditions.push(eq(releases.isTestData, false));
+      whereConditions.push(eq(releases.is_test_data, false));
     }
     
     if (filters?.artistId) {
-      whereConditions.push(eq(releases.artistId, filters.artistId));
+      whereConditions.push(eq(releases.artist_id, filters.artistId));
     }
     
     if (filters?.year) {
-      whereConditions.push(sql`EXTRACT(YEAR FROM ${releases.releaseDate}) = ${filters.year}`);
+      whereConditions.push(sql`EXTRACT(YEAR FROM ${releases.release_date}) = ${filters.year}`);
     }
 
     let query = db
       .select({
         id: releases.id,
-        artistId: releases.artistId,
+        artistId: releases.artist_id,
         title: releases.title,
-        releaseDate: releases.releaseDate,
-        coverUrl: releases.coverUrl,
-        streamingLinks: releases.streamingLinks,
-        isTestData: releases.isTestData,
-        createdAt: releases.createdAt,
+        releaseDate: releases.release_date,
+        coverUrl: releases.cover_url,
+        streamingLinks: releases.streaming_links,
+        isTestData: releases.is_test_data,
+        createdAt: releases.created_at,
         artist: {
           id: artists.id,
           name: artists.name,
-          createdAt: artists.createdAt,
+          createdAt: artists.created_at,
         },
         averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`,
         commentCount: sql<number>`COUNT(DISTINCT ${comments.id})`,
       })
       .from(releases)
-      .leftJoin(artists, eq(releases.artistId, artists.id))
-      .leftJoin(ratings, eq(releases.id, ratings.releaseId))
-      .leftJoin(comments, eq(releases.id, comments.releaseId))
+      .leftJoin(artists, eq(releases.artist_id, artists.id))
+      .leftJoin(ratings, eq(releases.id, ratings.release_id))
+      .leftJoin(comments, eq(releases.id, comments.release_id))
       .groupBy(releases.id, artists.id);
 
     if (whereConditions.length > 0) {
       query = query.where(and(...whereConditions)) as any;
     }
 
-    const result = await query.orderBy(desc(releases.createdAt));
+    const result = await query.orderBy(desc(releases.created_at));
     return result as (Release & { artist: Artist; averageRating: number; commentCount: number })[];
   }
 
@@ -222,36 +222,36 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db
       .select({
         id: releases.id,
-        artistId: releases.artistId,
+        artistId: releases.artist_id,
         title: releases.title,
-        releaseDate: releases.releaseDate,
-        coverUrl: releases.coverUrl,
-        streamingLinks: releases.streamingLinks,
-        isTestData: releases.isTestData,
-        createdAt: releases.createdAt,
+        releaseDate: releases.release_date,
+        coverUrl: releases.cover_url,
+        streamingLinks: releases.streaming_links,
+        isTestData: releases.is_test_data,
+        createdAt: releases.created_at,
         artist: {
           id: artists.id,
           name: artists.name,
-          createdAt: artists.createdAt,
+          createdAt: artists.created_at,
         },
         averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`,
         commentCount: sql<number>`COUNT(DISTINCT ${comments.id})`,
       })
       .from(releases)
-      .leftJoin(artists, eq(releases.artistId, artists.id))
-      .leftJoin(ratings, eq(releases.id, ratings.releaseId))
-      .leftJoin(comments, eq(releases.id, comments.releaseId))
+      .leftJoin(artists, eq(releases.artist_id, artists.id))
+      .leftJoin(ratings, eq(releases.id, ratings.release_id))
+      .leftJoin(comments, eq(releases.id, comments.release_id))
       .where(eq(releases.id, id))
       .groupBy(releases.id, artists.id);
 
     return result as (Release & { artist: Artist; averageRating: number; commentCount: number }) | undefined;
   }
 
-  async getReleaseByTitleAndArtist(title: string, artistId: number): Promise<Release | undefined> {
+  async getReleaseByTitleAndArtist(title: string, artist_id: number): Promise<Release | undefined> {
     const [release] = await db
       .select()
       .from(releases)
-      .where(and(eq(releases.title, title), eq(releases.artistId, artistId)));
+      .where(and(eq(releases.title, title), eq(releases.artist_id, artistId)));
     return release;
   }
 
@@ -278,37 +278,37 @@ export class DatabaseStorage implements IStorage {
     let orderByClause;
     
     if (sortBy === 'date_desc') {
-      orderByClause = [desc(releases.releaseDate), desc(releases.createdAt)];
+      orderByClause = [desc(releases.release_date), desc(releases.created_at)];
     } else if (sortBy === 'date_asc') {
-      orderByClause = [releases.releaseDate, releases.createdAt];
+      orderByClause = [releases.release_date, releases.created_at];
     } else if (sortBy === 'rating_desc') {
       orderByClause = [desc(sql`COALESCE(AVG(${ratings.score}), 0)`)];
     } else if (sortBy === 'rating_asc') {
       orderByClause = [sql`COALESCE(AVG(${ratings.score}), 0)`];
     } else {
       // Default sorting by relevance (no specific order)
-      orderByClause = [desc(releases.createdAt)];
+      orderByClause = [desc(releases.created_at)];
     }
 
     const result = await db
       .select({
         id: releases.id,
-        artistId: releases.artistId,
+        artistId: releases.artist_id,
         title: releases.title,
-        releaseDate: releases.releaseDate,
-        coverUrl: releases.coverUrl,
-        streamingLinks: releases.streamingLinks,
-        createdAt: releases.createdAt,
+        releaseDate: releases.release_date,
+        coverUrl: releases.cover_url,
+        streamingLinks: releases.streaming_links,
+        createdAt: releases.created_at,
         artist: {
           id: artists.id,
           name: artists.name,
-          createdAt: artists.createdAt,
+          createdAt: artists.created_at,
         },
         averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`.as('averageRating'),
       })
       .from(releases)
-      .leftJoin(artists, eq(releases.artistId, artists.id))
-      .leftJoin(ratings, eq(ratings.releaseId, releases.id))
+      .leftJoin(artists, eq(releases.artist_id, artists.id))
+      .leftJoin(ratings, eq(ratings.release_id, releases.id))
       .where(
         or(
           ilike(releases.title, `%${query}%`),
@@ -326,8 +326,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: artists.id,
         name: artists.name,
-        spotifyId: artists.spotifyId,
-        createdAt: artists.createdAt,
+        created_at: artists.created_at,
         latestReleaseCover: sql<string>`(
           SELECT r.cover_url 
           FROM releases r 
@@ -343,11 +342,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Rating operations
-  async getRating(userId: string, releaseId: number): Promise<Rating | undefined> {
+  async getRating(user_id: string, release_id: number): Promise<Rating | undefined> {
     const [rating] = await db
       .select()
       .from(ratings)
-      .where(and(eq(ratings.userId, userId), eq(ratings.releaseId, releaseId)));
+      .where(and(eq(ratings.user_id, user_id), eq(ratings.release_id, release_id)));
     return rating;
   }
 
@@ -356,30 +355,30 @@ export class DatabaseStorage implements IStorage {
       .insert(ratings)
       .values(rating)
       .onConflictDoUpdate({
-        target: [ratings.userId, ratings.releaseId],
+        target: [ratings.user_id, ratings.release_id],
         set: {
           score: rating.score,
-          updatedAt: new Date(),
+          updated_at: new Date(),
         },
       })
       .returning();
     return result;
   }
 
-  async getReleaseRatings(releaseId: number): Promise<{ averageRating: number; count: number }> {
+  async getReleaseRatings(release_id: number): Promise<{ averageRating: number; count: number }> {
     const [result] = await db
       .select({
         averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`,
         count: sql<number>`COUNT(*)`,
       })
       .from(ratings)
-      .where(eq(ratings.releaseId, releaseId));
+      .where(eq(ratings.release_id, release_id));
 
     return result || { averageRating: 0, count: 0 };
   }
 
   // Comment operations
-  async getComments(releaseId: number, sortBy: 'date' | 'rating' | 'likes' = 'date'): Promise<(Comment & { 
+  async getComments(release_id: number, sortBy: 'date' | 'rating' | 'likes' = 'date'): Promise<(Comment & { 
     user: Pick<User, 'id' | 'nickname' | 'profileImageUrl'> | null;
     likeCount: number;
     dislikeCount: number;
@@ -394,32 +393,32 @@ export class DatabaseStorage implements IStorage {
         orderBy = sql`like_count DESC`;
         break;
       default:
-        orderBy = desc(comments.createdAt);
+        orderBy = desc(comments.created_at);
     }
 
     const result = await db
       .select({
         id: comments.id,
-        userId: comments.userId,
-        releaseId: comments.releaseId,
+        user_id: comments.user_id,
+        release_id: comments.release_id,
         text: comments.text,
         rating: comments.rating,
-        isAnonymous: comments.isAnonymous,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
+        is_anonymous: comments.is_anonymous,
+        createdAt: comments.created_at,
+        updatedAt: comments.updated_at,
         user: {
           id: users.id,
           nickname: users.nickname,
-          profileImageUrl: users.profileImageUrl,
+          profileImageUrl: users.profile_image_url,
         },
         likeCount: sql<number>`COUNT(CASE WHEN ${commentReactions.reactionType} = 'like' THEN 1 END)`,
         dislikeCount: sql<number>`COUNT(CASE WHEN ${commentReactions.reactionType} = 'dislike' THEN 1 END)`,
       })
       .from(comments)
-      .leftJoin(users, and(eq(comments.userId, users.id), eq(comments.isAnonymous, false)))
+      .leftJoin(users, and(eq(comments.user_id, users.id), eq(comments.is_anonymous, false)))
       .leftJoin(commentReactions, eq(comments.id, commentReactions.commentId))
-      .where(eq(comments.releaseId, releaseId))
-      .groupBy(comments.id, users.id)
+      .where(eq(comments.release_id, release_id))
+      .groupBy(comments.id, comments.user_id, comments.release_id, comments.text, comments.rating, comments.is_anonymous, comments.created_at, comments.updated_at, users.id, users.nickname, users.profile_image_url)
       .orderBy(orderBy);
 
     return result as (Comment & { 
@@ -437,7 +436,7 @@ export class DatabaseStorage implements IStorage {
   async updateComment(id: number, comment: Partial<InsertComment>): Promise<Comment> {
     const [updatedComment] = await db
       .update(comments)
-      .set({ ...comment, updatedAt: new Date() })
+      .set({ ...comment, updated_at: new Date() })
       .where(eq(comments.id, id))
       .returning();
     return updatedComment;
@@ -447,11 +446,11 @@ export class DatabaseStorage implements IStorage {
     await db.delete(comments).where(eq(comments.id, id));
   }
 
-  async getUserCommentForRelease(userId: string, releaseId: number): Promise<Comment | null> {
+  async getUserCommentForRelease(user_id: string, release_id: number): Promise<Comment | null> {
     const [result] = await db
       .select()
       .from(comments)
-      .where(and(eq(comments.userId, userId), eq(comments.releaseId, releaseId)))
+      .where(and(eq(comments.user_id, user_id), eq(comments.release_id, release_id)))
       .limit(1);
     return result || null;
   }
@@ -462,7 +461,7 @@ export class DatabaseStorage implements IStorage {
       .insert(commentReactions)
       .values(reaction)
       .onConflictDoUpdate({
-        target: [commentReactions.commentId, commentReactions.userId],
+        target: [commentReactions.commentId, commentReactions.user_id],
         set: {
           reactionType: reaction.reactionType,
         },
@@ -471,10 +470,10 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
-  async deleteCommentReaction(commentId: number, userId: string): Promise<void> {
+  async deleteCommentReaction(commentId: number, user_id: string): Promise<void> {
     await db
       .delete(commentReactions)
-      .where(and(eq(commentReactions.commentId, commentId), eq(commentReactions.userId, userId)));
+      .where(and(eq(commentReactions.commentId, commentId), eq(commentReactions.user_id, user_id)));
   }
 
   // Report operations
@@ -491,16 +490,16 @@ export class DatabaseStorage implements IStorage {
         reportedBy: reports.reportedBy,
         reason: reports.reason,
         status: reports.status,
-        createdAt: reports.createdAt,
+        created_at: reports.created_at,
         comment: {
           id: comments.id,
-          userId: comments.userId,
-          releaseId: comments.releaseId,
+          user_id: comments.user_id,
+          release_id: comments.release_id,
           text: comments.text,
           rating: comments.rating,
-          isAnonymous: comments.isAnonymous,
-          createdAt: comments.createdAt,
-          updatedAt: comments.updatedAt,
+          is_anonymous: comments.is_anonymous,
+          createdAt: comments.created_at,
+          updatedAt: comments.updated_at,
         },
         user: {
           nickname: users.nickname,
@@ -514,7 +513,7 @@ export class DatabaseStorage implements IStorage {
       query = query.where(eq(reports.status, status)) as any;
     }
 
-    const result = await query.orderBy(desc(reports.createdAt));
+    const result = await query.orderBy(desc(reports.created_at));
     return result as (Report & { comment: Comment; user: Pick<User, 'nickname'> })[];
   }
 
@@ -528,37 +527,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   // User profile operations
-  async getUserRatings(userId: string): Promise<(Rating & { release: Release & { artist: Artist } })[]> {
+  async getUserRatings(user_id: string): Promise<(Rating & { release: Release & { artist: Artist } })[]> {
     const result = await db
       .select({
         id: ratings.id,
-        userId: ratings.userId,
-        releaseId: ratings.releaseId,
+        user_id: ratings.user_id,
+        release_id: ratings.release_id,
         score: ratings.score,
-        createdAt: ratings.createdAt,
-        updatedAt: ratings.updatedAt,
+        createdAt: ratings.created_at,
+        updatedAt: ratings.updated_at,
         release: {
           id: releases.id,
-          artistId: releases.artistId,
+          artistId: releases.artist_id,
           title: releases.title,
           type: releases.type,
-          releaseDate: releases.releaseDate,
-          coverUrl: releases.coverUrl,
-          streamingLinks: releases.streamingLinks,
-          isTestData: releases.isTestData,
-          createdAt: releases.createdAt,
+          releaseDate: releases.release_date,
+          coverUrl: releases.cover_url,
+          streamingLinks: releases.streaming_links,
+          isTestData: releases.is_test_data,
+          createdAt: releases.created_at,
         },
         artist: {
           id: artists.id,
           name: artists.name,
-          createdAt: artists.createdAt,
+          createdAt: artists.created_at,
         },
       })
       .from(ratings)
-      .leftJoin(releases, eq(ratings.releaseId, releases.id))
-      .leftJoin(artists, eq(releases.artistId, artists.id))
-      .where(eq(ratings.userId, userId))
-      .orderBy(desc(ratings.createdAt));
+      .leftJoin(releases, eq(ratings.release_id, releases.id))
+      .leftJoin(artists, eq(releases.artist_id, artists.id))
+      .where(eq(ratings.user_id, user_id))
+      .orderBy(desc(ratings.created_at));
 
     return result.map(row => ({
       ...row,
@@ -569,39 +568,39 @@ export class DatabaseStorage implements IStorage {
     })) as (Rating & { release: Release & { artist: Artist } })[];
   }
 
-  async getUserComments(userId: string): Promise<(Comment & { release: Release & { artist: Artist } })[]> {
+  async getUserComments(user_id: string): Promise<(Comment & { release: Release & { artist: Artist } })[]> {
     const result = await db
       .select({
         id: comments.id,
-        userId: comments.userId,
-        releaseId: comments.releaseId,
+        user_id: comments.user_id,
+        release_id: comments.release_id,
         text: comments.text,
         rating: comments.rating,
-        isAnonymous: comments.isAnonymous,
-        createdAt: comments.createdAt,
-        updatedAt: comments.updatedAt,
+        is_anonymous: comments.is_anonymous,
+        createdAt: comments.created_at,
+        updatedAt: comments.updated_at,
         release: {
           id: releases.id,
-          artistId: releases.artistId,
+          artistId: releases.artist_id,
           title: releases.title,
           type: releases.type,
-          releaseDate: releases.releaseDate,
-          coverUrl: releases.coverUrl,
-          streamingLinks: releases.streamingLinks,
-          isTestData: releases.isTestData,
-          createdAt: releases.createdAt,
+          releaseDate: releases.release_date,
+          coverUrl: releases.cover_url,
+          streamingLinks: releases.streaming_links,
+          isTestData: releases.is_test_data,
+          createdAt: releases.created_at,
         },
         artist: {
           id: artists.id,
           name: artists.name,
-          createdAt: artists.createdAt,
+          createdAt: artists.created_at,
         },
       })
       .from(comments)
-      .leftJoin(releases, eq(comments.releaseId, releases.id))
-      .leftJoin(artists, eq(releases.artistId, artists.id))
-      .where(eq(comments.userId, userId))
-      .orderBy(desc(comments.createdAt));
+      .leftJoin(releases, eq(comments.release_id, releases.id))
+      .leftJoin(artists, eq(releases.artist_id, artists.id))
+      .where(eq(comments.user_id, user_id))
+      .orderBy(desc(comments.created_at));
 
     return result.map(row => ({
       ...row,
@@ -619,16 +618,16 @@ export class DatabaseStorage implements IStorage {
         collection: collections,
         release: releases,
         artist: artists,
-        sortOrder: collectionReleases.sortOrder,
+        sort_order: collectionReleases.sort_order,
       })
       .from(collections)
-      .leftJoin(collectionReleases, eq(collections.id, collectionReleases.collectionId))
-      .leftJoin(releases, eq(collectionReleases.releaseId, releases.id))
-      .leftJoin(artists, eq(releases.artistId, artists.id))
-      .orderBy(collections.sortOrder, collectionReleases.sortOrder);
+      .leftJoin(collectionReleases, eq(collections.id, collectionReleases.collection_id))
+      .leftJoin(releases, eq(collectionReleases.release_id, releases.id))
+      .leftJoin(artists, eq(releases.artist_id, artists.id))
+      .orderBy(collections.sort_order, collectionReleases.sort_order);
 
     if (activeOnly) {
-      query.where(eq(collections.isActive, true));
+      query.where(eq(collections.is_active, true));
     }
 
     const result = await query;
@@ -661,14 +660,14 @@ export class DatabaseStorage implements IStorage {
         collection: collections,
         release: releases,
         artist: artists,
-        sortOrder: collectionReleases.sortOrder,
+        sort_order: collectionReleases.sort_order,
       })
       .from(collections)
-      .leftJoin(collectionReleases, eq(collections.id, collectionReleases.collectionId))
-      .leftJoin(releases, eq(collectionReleases.releaseId, releases.id))
-      .leftJoin(artists, eq(releases.artistId, artists.id))
+      .leftJoin(collectionReleases, eq(collections.id, collectionReleases.collection_id))
+      .leftJoin(releases, eq(collectionReleases.release_id, releases.id))
+      .leftJoin(artists, eq(releases.artist_id, artists.id))
       .where(eq(collections.id, id))
-      .orderBy(collectionReleases.sortOrder);
+      .orderBy(collectionReleases.sort_order);
 
     if (result.length === 0) return undefined;
 
@@ -697,7 +696,7 @@ export class DatabaseStorage implements IStorage {
   async updateCollection(id: number, collection: Partial<InsertCollection>): Promise<Collection> {
     const [updated] = await db
       .update(collections)
-      .set({ ...collection, updatedAt: new Date() })
+      .set({ ...collection, updated_at: new Date() })
       .where(eq(collections.id, id))
       .returning();
     return updated;
@@ -707,80 +706,43 @@ export class DatabaseStorage implements IStorage {
     await db.delete(collections).where(eq(collections.id, id));
   }
 
-  async addReleaseToCollection(collectionId: number, releaseId: number, sortOrder = 0): Promise<CollectionRelease> {
+  async addReleaseToCollection(collectionId: number, release_id: number, sortOrder = 0): Promise<CollectionRelease> {
     const [created] = await db
       .insert(collectionReleases)
-      .values({ collectionId, releaseId, sortOrder })
+      .values({ collectionId, release_id, sortOrder })
       .returning();
     return created;
   }
 
-  async removeReleaseFromCollection(collectionId: number, releaseId: number): Promise<void> {
+  async removeReleaseFromCollection(collectionId: number, release_id: number): Promise<void> {
     await db
       .delete(collectionReleases)
       .where(and(
-        eq(collectionReleases.collectionId, collectionId),
-        eq(collectionReleases.releaseId, releaseId)
+        eq(collectionReleases.collection_id, collectionId),
+        eq(collectionReleases.release_id, release_id)
       ));
   }
 
   async removeAllReleasesFromCollection(collectionId: number): Promise<void> {
     await db
       .delete(collectionReleases)
-      .where(eq(collectionReleases.collectionId, collectionId));
+      .where(eq(collectionReleases.collection_id, collectionId));
   }
 
-  async updateCollectionReleaseSortOrder(collectionId: number, releaseId: number, sortOrder: number): Promise<void> {
+  async updateCollectionReleaseSortOrder(collectionId: number, release_id: number, sort_order: number): Promise<void> {
     await db
       .update(collectionReleases)
-      .set({ sortOrder })
+      .set({ sort_order })
       .where(and(
-        eq(collectionReleases.collectionId, collectionId),
-        eq(collectionReleases.releaseId, releaseId)
+        eq(collectionReleases.collection_id, collectionId),
+        eq(collectionReleases.release_id, release_id)
       ));
   }
 
-  async getImportStats(): Promise<{
-    totalArtists: number;
-    totalReleases: number;
-    artistsWithSpotify: number;
-    recentReleases: number;
-  }> {
-    // Get total counts
-    const [totalArtistsResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(artists);
-    
-    const [totalReleasesResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(releases);
-    
-    // Get artists with Spotify IDs
-    const [artistsWithSpotifyResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(artists)
-      .where(sql`spotify_id IS NOT NULL AND spotify_id != ''`);
-    
-    // Get releases from the past week
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    
-    const [recentReleasesResult] = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(releases)
-      .where(sql`created_at > ${oneWeekAgo}`);
-    
-    return {
-      totalArtists: totalArtistsResult.count,
-      totalReleases: totalReleasesResult.count,
-      artistsWithSpotify: artistsWithSpotifyResult.count,
-      recentReleases: recentReleasesResult.count
-    };
-  }
 
   // Auto Import Playlists operations
   async getAutoImportPlaylists(): Promise<SelectAutoImportPlaylist[]> {
-    return await db.select().from(autoImportPlaylists).orderBy(autoImportPlaylists.sortOrder, autoImportPlaylists.createdAt);
+    return await db.select().from(autoImportPlaylists).orderBy(autoImportPlaylists.sort_order, autoImportPlaylists.created_at);
   }
 
   async createAutoImportPlaylist(playlist: InsertAutoImportPlaylist): Promise<SelectAutoImportPlaylist> {
@@ -791,7 +753,7 @@ export class DatabaseStorage implements IStorage {
   async updateAutoImportPlaylist(id: number, playlist: Partial<InsertAutoImportPlaylist>): Promise<SelectAutoImportPlaylist> {
     const [updated] = await db
       .update(autoImportPlaylists)
-      .set({ ...playlist, updatedAt: new Date() })
+      .set({ ...playlist, updated_at: new Date() })
       .where(eq(autoImportPlaylists.id, id))
       .returning();
     return updated;
@@ -820,7 +782,7 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(importLogs)
-      .orderBy(desc(importLogs.startedAt))
+      .orderBy(desc(importLogs.created_at))
       .limit(limit);
   }
 
@@ -828,9 +790,42 @@ export class DatabaseStorage implements IStorage {
     const [latest] = await db
       .select()
       .from(importLogs)
-      .orderBy(desc(importLogs.startedAt))
+      .orderBy(desc(importLogs.created_at))
       .limit(1);
     return latest;
+  }
+
+  // Import Statistics
+  async getImportStats(): Promise<{
+    totalArtists: number;
+    totalReleases: number;
+    artistsWithDeezer: number;
+    recentReleases: number;
+  }> {
+    const [totalArtists] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(artists);
+    
+    const [totalReleases] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(releases);
+    
+    const [artistsWithDeezer] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(artists)
+      .where(sql`deezer_id IS NOT NULL AND deezer_id != ''`);
+    
+    const [recentReleases] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(releases)
+      .where(sql`created_at >= NOW() - INTERVAL '7 days'`);
+
+    return {
+      totalArtists: totalArtists.count,
+      totalReleases: totalReleases.count,
+      artistsWithDeezer: artistsWithDeezer.count,
+      recentReleases: recentReleases.count,
+    };
   }
 
 }

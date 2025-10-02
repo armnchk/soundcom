@@ -19,6 +19,18 @@ export interface UnifiedAlbum {
   albumType: 'album' | 'single' | 'compilation';
   trackCount?: number;
   imageUrl?: string;
+  coverSmall?: string;
+  coverMedium?: string;
+  coverBig?: string;
+  coverXl?: string;
+  duration?: number; // общая длительность в секундах
+  explicitLyrics?: boolean;
+  explicitContentLyrics?: number; // 0-4
+  explicitContentCover?: number; // 0-4
+  genres?: any[]; // массив жанров
+  upc?: string; // UPC код
+  label?: string; // лейбл звукозаписи
+  contributors?: any[]; // участники
   source: 'deezer' | 'itunes';
 }
 
@@ -51,7 +63,9 @@ class DeezerAPIClient {
         id: artist.id.toString(),
         name: artist.name,
         imageUrl: artist.picture_medium || artist.picture,
+        genres: artist.genres || [],
         popularity: artist.nb_fan || 0,
+        followers: artist.nb_fan || 0,
         source: 'deezer'
       };
       
@@ -76,15 +90,56 @@ class DeezerAPIClient {
       const albums: UnifiedAlbum[] = [];
       
       if (data.data) {
-        albums.push(...data.data.map((album: any) => ({
-          id: album.id.toString(),
-          title: album.title,
-          releaseDate: album.release_date,
-          albumType: this.mapDeezerAlbumType(album.record_type),
-          trackCount: album.nb_tracks,
-          imageUrl: album.cover_medium || album.cover,
-          source: 'deezer' as const
-        })));
+        // Получаем детальную информацию для каждого альбома
+        const albumPromises = data.data.map(async (album: any) => {
+          try {
+            const albumDetailResponse = await fetch(`${this.baseUrl}/album/${album.id}`);
+            if (albumDetailResponse.ok) {
+              const albumDetail = await albumDetailResponse.json();
+              return {
+                id: album.id.toString(),
+                title: album.title,
+                releaseDate: album.release_date,
+                albumType: this.mapDeezerAlbumType(album.record_type),
+                trackCount: album.nb_tracks,
+                imageUrl: album.cover_medium || album.cover,
+                coverSmall: album.cover_small,
+                coverMedium: album.cover_medium,
+                coverBig: album.cover_big,
+                coverXl: album.cover_xl,
+                duration: albumDetail.duration,
+                explicitLyrics: albumDetail.explicit_lyrics || false,
+                explicitContentLyrics: albumDetail.explicit_content_lyrics || 0,
+                explicitContentCover: albumDetail.explicit_content_cover || 0,
+                genres: albumDetail.genres?.data || [],
+                upc: albumDetail.upc,
+                label: albumDetail.label,
+                contributors: albumDetail.contributors || [],
+                source: 'deezer' as const
+              };
+            }
+          } catch (error) {
+            console.log(`🟡 Deezer: Не удалось получить детали альбома ${album.id}`);
+          }
+          
+          // Fallback к базовой информации
+          return {
+            id: album.id.toString(),
+            title: album.title,
+            releaseDate: album.release_date,
+            albumType: this.mapDeezerAlbumType(album.record_type),
+            trackCount: album.nb_tracks,
+            imageUrl: album.cover_medium || album.cover,
+            coverSmall: album.cover_small,
+            coverMedium: album.cover_medium,
+            coverBig: album.cover_big,
+            coverXl: album.cover_xl,
+            source: 'deezer' as const
+          };
+        });
+        
+        const albumResults = await Promise.all(albumPromises);
+        albums.push(...albumResults.filter(Boolean));
       }
       
       // Дополнительный поиск последних релизов через search API
@@ -102,19 +157,59 @@ class DeezerAPIClient {
               const existingIds = new Set(albums.map(a => a.id));
               
               // Добавляем найденные альбомы, которых еще нет
-              searchData.data
-                .filter((album: any) => album.artist && album.artist.id.toString() === artistId && !existingIds.has(album.id.toString()))
-                .forEach((album: any) => {
-                  albums.push({
-                    id: album.id.toString(),
-                    title: album.title,
-                    releaseDate: album.release_date,
-                    albumType: this.mapDeezerAlbumType(album.record_type),
-                    trackCount: album.nb_tracks,
-                    imageUrl: album.cover_medium || album.cover,
-                    source: 'deezer' as const
-                  });
-                });
+              const additionalAlbums = searchData.data
+                .filter((album: any) => album.artist && album.artist.id.toString() === artistId && !existingIds.has(album.id.toString()));
+              
+              // Получаем детальную информацию для дополнительных альбомов
+              const additionalPromises = additionalAlbums.map(async (album: any) => {
+                try {
+                  const albumDetailResponse = await fetch(`${this.baseUrl}/album/${album.id}`);
+                  if (albumDetailResponse.ok) {
+                    const albumDetail = await albumDetailResponse.json();
+                    return {
+                      id: album.id.toString(),
+                      title: album.title,
+                      releaseDate: album.release_date,
+                      albumType: this.mapDeezerAlbumType(album.record_type),
+                      trackCount: album.nb_tracks,
+                      imageUrl: album.cover_medium || album.cover,
+                      coverSmall: album.cover_small,
+                      coverMedium: album.cover_medium,
+                      coverBig: album.cover_big,
+                      coverXl: album.cover_xl,
+                      duration: albumDetail.duration,
+                      explicitLyrics: albumDetail.explicit_lyrics || false,
+                      explicitContentLyrics: albumDetail.explicit_content_lyrics || 0,
+                      explicitContentCover: albumDetail.explicit_content_cover || 0,
+                      genres: albumDetail.genres?.data || [],
+                      upc: albumDetail.upc,
+                      label: albumDetail.label,
+                      contributors: albumDetail.contributors || [],
+                      source: 'deezer' as const
+                    };
+                  }
+                } catch (error) {
+                  console.log(`🟡 Deezer: Не удалось получить детали дополнительного альбома ${album.id}`);
+                }
+                
+                // Fallback к базовой информации
+                return {
+                  id: album.id.toString(),
+                  title: album.title,
+                  releaseDate: album.release_date,
+                  albumType: this.mapDeezerAlbumType(album.record_type),
+                  trackCount: album.nb_tracks,
+                  imageUrl: album.cover_medium || album.cover,
+                  coverSmall: album.cover_small,
+                  coverMedium: album.cover_medium,
+                  coverBig: album.cover_big,
+                  coverXl: album.cover_xl,
+                  source: 'deezer' as const
+                };
+              });
+              
+              const additionalResults = await Promise.all(additionalPromises);
+              albums.push(...additionalResults.filter(Boolean));
             }
           }
         }
@@ -296,10 +391,12 @@ export class CombinedMusicAPI {
     let albums: UnifiedAlbum[] = [];
     
     if (artist) {
+      console.log(`🔍 DEBUG: Deezer нашел артиста:`, JSON.stringify(artist, null, 2));
       albums = await this.deezer.getArtistAlbums(artist.id);
       
       if (albums.length > 0) {
         console.log(`✅ Deezer успешно: ${albums.length} альбомов для "${artist.name}"`);
+        console.log(`🔍 DEBUG: Возвращаем результат:`, JSON.stringify({ artist, albums }, null, 2));
         return { artist, albums };
       } else {
         console.log(`⚠️ Deezer: найден артист, но нет альбомов. Пробуем iTunes...`);
