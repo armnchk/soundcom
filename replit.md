@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express.js framework
 - **Language**: TypeScript with ES modules
 - **API Design**: RESTful API endpoints with JSON responses
-- **Authentication**: Replit Auth with OpenID Connect (OIDC) for OAuth authentication
+- **Authentication**: Google OAuth 2.0 (passport-google-oauth20)
 - **Session Management**: Express sessions with PostgreSQL session store
 - **Middleware**: Request logging, error handling, and authentication middleware
 
@@ -38,7 +38,7 @@ Preferred communication style: Simple, everyday language.
   - Sessions table for authentication persistence
 
 ### Authentication & Authorization
-- **Provider**: Google OAuth via Replit Auth
+- **Provider**: Google OAuth 2.0
 - **Session Storage**: PostgreSQL-backed sessions with configurable TTL
 - **User Management**: Profile creation with nickname requirement
 - **Admin System**: Role-based access control for administrative functions
@@ -54,9 +54,9 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 ### Core Infrastructure
-- **Database**: Neon PostgreSQL serverless database
-- **Authentication**: Replit Auth with Google OAuth provider
-- **Hosting**: Replit platform with integrated development environment
+- **Database**: Neon PostgreSQL serverless database (or any PostgreSQL)
+- **Authentication**: Google OAuth 2.0
+- **Hosting**: Any Node-compatible hosting
 
 ### Frontend Libraries
 - **UI Framework**: Radix UI component primitives

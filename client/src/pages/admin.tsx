@@ -196,14 +196,7 @@ export default function Admin() {
             <FolderOpen className="w-4 h-4 mr-2" />
             Подборки
           </Button>
-          <Button
-            variant={activeTab === 'music-import' ? 'default' : 'secondary'}
-            onClick={() => setActiveTab('music-import')}
-            data-testid="tab-music-import"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Импорт музыки
-          </Button>
+          
           <Button
             variant={activeTab === 'playlists' ? 'default' : 'secondary'}
             onClick={() => setActiveTab('playlists')}
@@ -356,10 +349,7 @@ export default function Admin() {
           <CollectionsTab />
         )}
 
-        {/* Music Import Tab */}
-        {activeTab === 'music-import' && (
-          <YandexMusicImportTab />
-        )}
+        
 
         {/* Playlists Tab */}
         {activeTab === 'playlists' && (
@@ -617,8 +607,7 @@ function YandexMusicImportTab() {
       {/* Background Import Jobs */}
       <BackgroundImportSection />
 
-      {/* Automatic Scheduler Management */}
-      <AutomaticSchedulerSection />
+      
     </div>
   );
 }

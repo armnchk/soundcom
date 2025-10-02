@@ -1,0 +1,1265 @@
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MusicReview - Discover, Rate, and Review Music</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                borderRadius: {
+                    lg: "var(--radius)",
+                    md: "calc(var(--radius) - 2px)",
+                    sm: "calc(var(--radius) - 4px)",
+                },
+                colors: {
+                    background: "var(--background)",
+                    foreground: "var(--foreground)",
+                    card: {
+                        DEFAULT: "var(--card)",
+                        foreground: "var(--card-foreground)",
+                    },
+                    popover: {
+                        DEFAULT: "var(--popover)",
+                        foreground: "var(--popover-foreground)",
+                    },
+                    primary: {
+                        DEFAULT: "var(--primary)",
+                        foreground: "var(--primary-foreground)",
+                    },
+                    secondary: {
+                        DEFAULT: "var(--secondary)",
+                        foreground: "var(--secondary-foreground)",
+                    },
+                    muted: {
+                        DEFAULT: "var(--muted)",
+                        foreground: "var(--muted-foreground)",
+                    },
+                    accent: {
+                        DEFAULT: "var(--accent)",
+                        foreground: "var(--accent-foreground)",
+                    },
+                    destructive: {
+                        DEFAULT: "var(--destructive)",
+                        foreground: "var(--destructive-foreground)",
+                    },
+                    border: "var(--border)",
+                    input: "var(--input)",
+                    ring: "var(--ring)",
+                }
+            },
+            fontFamily: {
+                sans: ["Inter", "system-ui", "sans-serif"],
+            }
+        },
+    };
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --background: hsl(222 84% 5%);
+            --foreground: hsl(210 40% 98%);
+            --card: hsl(222 84% 8%);
+            --card-foreground: hsl(210 40% 98%);
+            --popover: hsl(222 84% 8%);
+            --popover-foreground: hsl(210 40% 98%);
+            --primary: hsl(280 100% 70%);
+            --primary-foreground: hsl(222 84% 5%);
+            --secondary: hsl(217 32% 17%);
+            --secondary-foreground: hsl(210 40% 98%);
+            --muted: hsl(217 32% 17%);
+            --muted-foreground: hsl(215 20.2% 65.1%);
+            --accent: hsl(320 100% 70%);
+            --accent-foreground: hsl(222 84% 5%);
+            --destructive: hsl(0 62.8% 30.6%);
+            --destructive-foreground: hsl(210 40% 98%);
+            --border: hsl(217 32% 17%);
+            --input: hsl(217 32% 17%);
+            --ring: hsl(280 100% 70%);
+            --radius: 0.75rem;
+        }
+
+        .rating-stars {
+            display: inline-flex;
+            gap: 2px;
+        }
+
+        .rating-star {
+            color: hsl(215 20.2% 65.1%);
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+
+        .rating-star:hover,
+        .rating-star.active {
+            color: hsl(45 93% 47%);
+        }
+
+        .album-cover {
+            aspect-ratio: 1;
+            object-fit: cover;
+        }
+
+        .gradient-overlay {
+            background: linear-gradient(135deg, hsl(280 100% 70%) 0%, hsl(320 100% 70%) 100%);
+        }
+
+        .comment-thread {
+            border-left: 2px solid hsl(217 32% 17%);
+        }
+
+        .section-divider {
+            background: linear-gradient(90deg, transparent 0%, hsl(217 32% 17%) 50%, transparent 100%);
+            height: 1px;
+        }
+    </style>
+</head>
+
+<body class="bg-background text-foreground min-h-screen">
+    <!-- @COMPONENT: Navigation -->
+    <nav class="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center">
+                        <i class="fas fa-music text-primary-foreground text-sm"></i>
+                    </div>
+                    <span class="text-xl font-bold text-foreground">MusicReview</span>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="hidden md:flex flex-1 max-w-md mx-8">
+                    <div class="relative w-full">
+                        <input type="text" 
+                               placeholder="Search albums, artists, songs..." 
+                               class="w-full px-4 py-2 pl-10 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent text-foreground placeholder-muted-foreground"
+                               data-implementation="Connect to search API with debounced queries">
+                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
+                    </div>
+                </div>
+
+                <!-- User Menu -->
+                <div class="flex items-center space-x-4">
+                    <button class="hidden md:inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                            data-event="click:handleGoogleAuth">
+                        <i class="fab fa-google mr-2"></i>
+                        Sign In
+                    </button>
+                    <!-- User Profile (when authenticated) -->
+                    <div class="hidden items-center space-x-2" data-show-when="authenticated">
+                        <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=40&h=40" 
+                             alt="User Profile" 
+                             class="w-8 h-8 rounded-full" 
+                             data-mock-image="true"
+                             data-bind="user.profileImage">
+                        <span class="text-sm font-medium" data-bind="user.nickname">JohnDoe</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    <!-- @END_COMPONENT: Navigation -->
+
+    <!-- Mobile Search (shown on mobile) -->
+    <div class="md:hidden px-4 py-3 border-b border-border">
+        <div class="relative">
+            <input type="text" 
+                   placeholder="Search music..." 
+                   class="w-full px-4 py-2 pl-10 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground placeholder-muted-foreground">
+            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"></i>
+        </div>
+    </div>
+
+    <!-- @COMPONENT: Homepage -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Hero Section -->
+        <section class="mb-12">
+            <div class="relative overflow-hidden rounded-xl bg-gradient-to-r from-primary/20 to-accent/20 p-8 md:p-12">
+                <div class="relative z-10">
+                    <h1 class="text-4xl md:text-5xl font-bold text-foreground mb-4">
+                        Discover & Rate Music
+                    </h1>
+                    <p class="text-xl text-muted-foreground mb-6 max-w-2xl">
+                        Join the community of music lovers. Rate albums, share reviews, and discover your next favorite artist.
+                    </p>
+                    <button class="bg-primary text-primary-foreground px-6 py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                            data-event="click:scrollToNewReleases">
+                        Explore New Releases
+                    </button>
+                </div>
+                <div class="absolute top-0 right-0 w-64 h-64 opacity-10">
+                    <i class="fas fa-music text-8xl text-primary"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Filter Bar -->
+        <div class="flex flex-wrap items-center gap-4 mb-8 p-4 bg-card rounded-lg border border-border">
+            <span class="text-sm font-medium text-muted-foreground">Filter by:</span>
+            
+            <select class="bg-input border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:ring-2 focus:ring-ring"
+                    data-implementation="Connect to genre filter API">
+                <option>All Genres</option>
+                <option>Rock</option>
+                <option>Pop</option>
+                <option>Hip-Hop</option>
+                <option>Electronic</option>
+                <option>Jazz</option>
+            </select>
+            
+            <select class="bg-input border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:ring-2 focus:ring-ring"
+                    data-implementation="Connect to year filter API">
+                <option>All Years</option>
+                <option>2024</option>
+                <option>2023</option>
+                <option>2022</option>
+                <option>2021</option>
+            </select>
+
+            <button class="ml-auto text-sm text-primary hover:text-primary/80 transition-colors"
+                    data-event="click:clearFilters">
+                Clear Filters
+            </button>
+        </div>
+
+        <!-- New Releases Section -->
+        <section class="mb-12">
+            <h2 class="text-2xl font-bold text-foreground mb-6 flex items-center">
+                <i class="fas fa-clock mr-3 text-primary"></i>
+                Latest Releases
+            </h2>
+            
+            <!-- @MAP: newReleases.map(release => ( -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <!-- Release Card 1 -->
+                <div class="group cursor-pointer" data-event="click:navigateToRelease" data-bind="release.id">
+                    <div class="bg-card rounded-lg p-4 border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
+                        <!-- Modern abstract electronic album cover with geometric patterns -->
+                        <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300" 
+                             alt="Album Cover" 
+                             class="album-cover rounded-md w-full mb-3 group-hover:scale-105 transition-transform duration-300"
+                             data-bind="release.coverUrl"
+                             data-mock-image="true">
+                        
+                        <h3 class="font-semibold text-foreground text-sm mb-1 truncate" data-bind="release.title">Midnight Dreams</h3>
+                        <p class="text-muted-foreground text-xs mb-2 truncate" data-bind="release.artist">The Neon Collective</p>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="rating-stars">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <span class="text-xs text-muted-foreground ml-2" data-bind="release.averageRating">8.2</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground" data-bind="release.commentCount">23</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Release Card 2 -->
+                <div class="group cursor-pointer" data-event="click:navigateToRelease">
+                    <div class="bg-card rounded-lg p-4 border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
+                        <!-- Vintage vinyl record on a turntable in warm lighting -->
+                        <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300" 
+                             alt="Album Cover" 
+                             class="album-cover rounded-md w-full mb-3 group-hover:scale-105 transition-transform duration-300"
+                             data-mock-image="true">
+                        
+                        <h3 class="font-semibold text-foreground text-sm mb-1 truncate">Retrograde Sessions</h3>
+                        <p class="text-muted-foreground text-xs mb-2 truncate">Analog Soul</p>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="rating-stars">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <span class="text-xs text-muted-foreground ml-2">9.1</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground">45</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Release Card 3 -->
+                <div class="group cursor-pointer" data-event="click:navigateToRelease">
+                    <div class="bg-card rounded-lg p-4 border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
+                        <!-- Urban street art mural with vibrant colors representing hip-hop culture -->
+                        <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300" 
+                             alt="Album Cover" 
+                             class="album-cover rounded-md w-full mb-3 group-hover:scale-105 transition-transform duration-300"
+                             data-mock-image="true">
+                        
+                        <h3 class="font-semibold text-foreground text-sm mb-1 truncate">Street Chronicles</h3>
+                        <p class="text-muted-foreground text-xs mb-2 truncate">MC Wordsmith</p>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="rating-stars">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <span class="text-xs text-muted-foreground ml-2">7.8</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground">18</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Release Card 4 -->
+                <div class="group cursor-pointer" data-event="click:navigateToRelease">
+                    <div class="bg-card rounded-lg p-4 border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
+                        <!-- Classical concert hall with orchestra performing, elegant lighting -->
+                        <img src="https://images.unsplash.com/photo-1465847899084-d164df4dedc6?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300" 
+                             alt="Album Cover" 
+                             class="album-cover rounded-md w-full mb-3 group-hover:scale-105 transition-transform duration-300"
+                             data-mock-image="true">
+                        
+                        <h3 class="font-semibold text-foreground text-sm mb-1 truncate">Symphony No. 9</h3>
+                        <p class="text-muted-foreground text-xs mb-2 truncate">Vienna Orchestra</p>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="rating-stars">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <span class="text-xs text-muted-foreground ml-2">8.7</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground">12</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Release Card 5 -->
+                <div class="group cursor-pointer" data-event="click:navigateToRelease">
+                    <div class="bg-card rounded-lg p-4 border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
+                        <!-- Indie folk musician with acoustic guitar in cozy coffee shop setting -->
+                        <img src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300" 
+                             alt="Album Cover" 
+                             class="album-cover rounded-md w-full mb-3 group-hover:scale-105 transition-transform duration-300"
+                             data-mock-image="true">
+                        
+                        <h3 class="font-semibold text-foreground text-sm mb-1 truncate">Coffee Shop Tales</h3>
+                        <p class="text-muted-foreground text-xs mb-2 truncate">Emma Rivers</p>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="rating-stars">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <span class="text-xs text-muted-foreground ml-2">9.3</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground">67</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Release Card 6 -->
+                <div class="group cursor-pointer" data-event="click:navigateToRelease">
+                    <div class="bg-card rounded-lg p-4 border border-border hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/10">
+                        <!-- Synthwave aesthetic with neon lights and retro 80s vibe -->
+                        <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=300" 
+                             alt="Album Cover" 
+                             class="album-cover rounded-md w-full mb-3 group-hover:scale-105 transition-transform duration-300"
+                             data-mock-image="true">
+                        
+                        <h3 class="font-semibold text-foreground text-sm mb-1 truncate">Neon Highways</h3>
+                        <p class="text-muted-foreground text-xs mb-2 truncate">Synthwave Dreams</p>
+                        
+                        <div class="flex items-center justify-between">
+                            <div class="rating-stars">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <span class="text-xs text-muted-foreground ml-2">7.5</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground">31</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_MAP )) -->
+        </section>
+
+        <!-- Section Divider -->
+        <div class="section-divider mb-12"></div>
+
+        <!-- Most Discussed Section -->
+        <section class="mb-12">
+            <h2 class="text-2xl font-bold text-foreground mb-6 flex items-center">
+                <i class="fas fa-comments mr-3 text-accent"></i>
+                Most Discussed
+            </h2>
+            
+            <div class="space-y-4">
+                <!-- @MAP: discussedReleases.map(release => ( -->
+                <!-- Discussed Release 1 -->
+                <div class="bg-card rounded-lg border border-border p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                     data-event="click:navigateToRelease">
+                    <div class="flex items-center space-x-4">
+                        <!-- Album cover showing jazz musicians in a dimly lit club -->
+                        <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80" 
+                             alt="Album Cover" 
+                             class="w-16 h-16 rounded-md flex-shrink-0"
+                             data-bind="release.coverUrl"
+                             data-mock-image="true">
+                        
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-semibold text-foreground truncate" data-bind="release.title">Blue Note Sessions</h3>
+                            <p class="text-muted-foreground text-sm truncate" data-bind="release.artist">Miles Ahead Quartet</p>
+                            <p class="text-xs text-muted-foreground mt-1" data-bind="release.releaseDate">Released January 15, 2024</p>
+                        </div>
+                        
+                        <div class="flex flex-col items-end space-y-1">
+                            <div class="rating-stars text-xs">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <span class="text-muted-foreground ml-1" data-bind="release.averageRating">8.4</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground flex items-center">
+                                <i class="fas fa-comment mr-1"></i>
+                                <span data-bind="release.commentCount">89</span> comments
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Discussed Release 2 -->
+                <div class="bg-card rounded-lg border border-border p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                     data-event="click:navigateToRelease">
+                    <div class="flex items-center space-x-4">
+                        <!-- Rock concert with dramatic stage lighting and crowd -->
+                        <img src="https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80" 
+                             alt="Album Cover" 
+                             class="w-16 h-16 rounded-md flex-shrink-0"
+                             data-mock-image="true">
+                        
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-semibold text-foreground truncate">Thunder & Lightning</h3>
+                            <p class="text-muted-foreground text-sm truncate">Electric Storm</p>
+                            <p class="text-xs text-muted-foreground mt-1">Released December 8, 2023</p>
+                        </div>
+                        
+                        <div class="flex flex-col items-end space-y-1">
+                            <div class="rating-stars text-xs">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <span class="text-muted-foreground ml-1">9.0</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground flex items-center">
+                                <i class="fas fa-comment mr-1"></i>
+                                156 comments
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Discussed Release 3 -->
+                <div class="bg-card rounded-lg border border-border p-4 hover:border-primary/50 transition-colors cursor-pointer"
+                     data-event="click:navigateToRelease">
+                    <div class="flex items-center space-x-4">
+                        <!-- Minimalist pop album cover with pastel colors and clean design -->
+                        <img src="https://images.unsplash.com/photo-1511379938547-c1f69419868d?ixlib=rb-4.0.3&auto=format&fit=crop&w=80&h=80" 
+                             alt="Album Cover" 
+                             class="w-16 h-16 rounded-md flex-shrink-0"
+                             data-mock-image="true">
+                        
+                        <div class="flex-1 min-w-0">
+                            <h3 class="font-semibold text-foreground truncate">Pastel Dreams</h3>
+                            <p class="text-muted-foreground text-sm truncate">Luna Park</p>
+                            <p class="text-xs text-muted-foreground mt-1">Released February 3, 2024</p>
+                        </div>
+                        
+                        <div class="flex flex-col items-end space-y-1">
+                            <div class="rating-stars text-xs">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <i class="fas fa-star rating-star"></i>
+                                <span class="text-muted-foreground ml-1">7.2</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground flex items-center">
+                                <i class="fas fa-comment mr-1"></i>
+                                72 comments
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_MAP )) -->
+            </div>
+        </section>
+
+        <!-- Section Divider -->
+        <div class="section-divider mb-12"></div>
+
+        <!-- Release Detail Modal/Page (simulated) -->
+        <section class="mb-12" id="release-detail-demo">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-primary mb-2">Release Page Demo</h2>
+                <p class="text-muted-foreground">Click any release card above to see this detail view</p>
+            </div>
+            
+            <!-- @COMPONENT: ReleaseDetailPage -->
+            <div class="bg-card rounded-xl border border-border p-6 md:p-8">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <!-- Release Info -->
+                    <div class="md:col-span-1">
+                        <!-- Modern abstract electronic album cover with geometric patterns -->
+                        <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=400" 
+                             alt="Midnight Dreams Album Cover" 
+                             class="album-cover rounded-xl w-full mb-6 shadow-lg"
+                             data-bind="release.coverUrl"
+                             data-mock-image="true">
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h1 class="text-2xl font-bold text-foreground mb-1" data-bind="release.title">Midnight Dreams</h1>
+                                <p class="text-lg text-muted-foreground" data-bind="release.artist">The Neon Collective</p>
+                                <p class="text-sm text-muted-foreground" data-bind="release.releaseDate">Released January 15, 2024</p>
+                            </div>
+                            
+                            <!-- Average Rating Display -->
+                            <div class="bg-secondary rounded-lg p-4">
+                                <h3 class="text-sm font-semibold text-foreground mb-2">Community Rating</h3>
+                                <div class="flex items-center space-x-3">
+                                    <span class="text-3xl font-bold text-primary" data-bind="release.averageRating">8.2</span>
+                                    <div>
+                                        <div class="rating-stars">
+                                            <i class="fas fa-star rating-star active"></i>
+                                            <i class="fas fa-star rating-star active"></i>
+                                            <i class="fas fa-star rating-star active"></i>
+                                            <i class="fas fa-star rating-star active"></i>
+                                            <i class="fas fa-star rating-star"></i>
+                                        </div>
+                                        <p class="text-xs text-muted-foreground mt-1" data-bind="release.ratingCount">Based on 127 ratings</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- User's Rating (if exists) -->
+                            <div class="bg-muted rounded-lg p-4" data-show-when="userHasRated">
+                                <h3 class="text-sm font-semibold text-foreground mb-2">Your Rating</h3>
+                                <div class="rating-stars">
+                                    <i class="fas fa-star rating-star active"></i>
+                                    <i class="fas fa-star rating-star active"></i>
+                                    <i class="fas fa-star rating-star active"></i>
+                                    <i class="fas fa-star rating-star active"></i>
+                                    <i class="fas fa-star rating-star"></i>
+                                    <span class="text-sm text-muted-foreground ml-2" data-bind="userRating.score">8</span>
+                                </div>
+                            </div>
+
+                            <!-- Streaming Links -->
+                            <div class="space-y-2">
+                                <h3 class="text-sm font-semibold text-foreground">Listen On</h3>
+                                <div class="flex flex-col space-y-2">
+                                    <a href="#" class="flex items-center space-x-3 p-3 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
+                                       data-implementation="Link to actual streaming service">
+                                        <i class="fab fa-spotify text-green-500"></i>
+                                        <span class="text-sm text-foreground">Spotify</span>
+                                    </a>
+                                    <a href="#" class="flex items-center space-x-3 p-3 bg-secondary rounded-lg hover:bg-secondary/80 transition-colors"
+                                       data-implementation="Link to actual streaming service">
+                                        <i class="fab fa-apple text-gray-300"></i>
+                                        <span class="text-sm text-foreground">Apple Music</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comments and Ratings Section -->
+                    <div class="md:col-span-2">
+                        <!-- Rate This Release -->
+                        <div class="mb-8" data-show-when="authenticated">
+                            <h3 class="text-lg font-semibold text-foreground mb-4">Rate This Release</h3>
+                            <div class="bg-secondary rounded-lg p-6">
+                                <!-- Rating Input -->
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-foreground mb-2">Your Rating</label>
+                                    <div class="rating-stars text-xl" data-implementation="Interactive rating component">
+                                        <i class="fas fa-star rating-star" data-rating="1"></i>
+                                        <i class="fas fa-star rating-star" data-rating="2"></i>
+                                        <i class="fas fa-star rating-star" data-rating="3"></i>
+                                        <i class="fas fa-star rating-star" data-rating="4"></i>
+                                        <i class="fas fa-star rating-star" data-rating="5"></i>
+                                        <i class="fas fa-star rating-star" data-rating="6"></i>
+                                        <i class="fas fa-star rating-star" data-rating="7"></i>
+                                        <i class="fas fa-star rating-star" data-rating="8"></i>
+                                        <i class="fas fa-star rating-star" data-rating="9"></i>
+                                        <i class="fas fa-star rating-star" data-rating="10"></i>
+                                    </div>
+                                </div>
+
+                                <!-- Comment Form -->
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-foreground mb-2">Add a Review (Optional)</label>
+                                    <textarea 
+                                        placeholder="Share your thoughts about this release..."
+                                        class="w-full px-3 py-2 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground placeholder-muted-foreground resize-none"
+                                        rows="3"
+                                        maxlength="1000"
+                                        data-implementation="Character counter and validation"></textarea>
+                                    <div class="flex justify-between items-center mt-2">
+                                        <label class="flex items-center space-x-2 text-sm">
+                                            <input type="checkbox" class="w-4 h-4 text-primary bg-input border-border rounded focus:ring-ring">
+                                            <span class="text-muted-foreground">Post anonymously</span>
+                                        </label>
+                                        <span class="text-xs text-muted-foreground">0/1000</span>
+                                    </div>
+                                </div>
+
+                                <button class="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                                        data-event="click:submitRating">
+                                    Submit Rating
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Comments Filter -->
+                        <div class="flex items-center justify-between mb-6">
+                            <h3 class="text-lg font-semibold text-foreground">Reviews & Comments</h3>
+                            <select class="bg-input border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:ring-2 focus:ring-ring"
+                                    data-implementation="Sort comments functionality">
+                                <option>Sort by Date</option>
+                                <option>Sort by Rating</option>
+                                <option>Sort by Likes</option>
+                            </select>
+                        </div>
+
+                        <!-- Comments List -->
+                        <div class="space-y-6">
+                            <!-- @MAP: comments.map(comment => ( -->
+                            <!-- Comment 1 -->
+                            <div class="bg-secondary rounded-lg p-4" data-bind="comment.id">
+                                <div class="flex items-start space-x-4">
+                                    <!-- User avatar placeholder or anonymous icon -->
+                                    <div class="w-10 h-10 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span class="text-primary-foreground font-semibold text-sm" data-bind="comment.user.initials">MJ</span>
+                                    </div>
+                                    
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-2 mb-2">
+                                            <span class="font-medium text-foreground text-sm" data-bind="comment.user.nickname">MusicJunkie92</span>
+                                            <div class="rating-stars text-xs">
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <span class="text-muted-foreground ml-1" data-bind="comment.rating">9</span>
+                                            </div>
+                                            <span class="text-xs text-muted-foreground" data-bind="comment.createdAt">2 days ago</span>
+                                        </div>
+                                        
+                                        <p class="text-foreground text-sm leading-relaxed mb-3" data-bind="comment.text">
+                                            Absolutely stunning album! The production quality is incredible and each track flows seamlessly into the next. The Neon Collective has really outdone themselves with this one. The synth work in track 4 gave me chills.
+                                        </p>
+                                        
+                                        <div class="flex items-center space-x-4">
+                                            <button class="flex items-center space-x-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                                    data-event="click:likeComment">
+                                                <i class="fas fa-thumbs-up"></i>
+                                                <span data-bind="comment.likes">12</span>
+                                            </button>
+                                            <button class="flex items-center space-x-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                                    data-event="click:dislikeComment">
+                                                <i class="fas fa-thumbs-down"></i>
+                                                <span data-bind="comment.dislikes">1</span>
+                                            </button>
+                                            <button class="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                                    data-event="click:reportComment">
+                                                <i class="fas fa-flag mr-1"></i>
+                                                Report
+                                            </button>
+                                            <!-- Show edit/delete for comment owner -->
+                                            <div class="ml-auto flex items-center space-x-2" data-show-when="isCommentOwner">
+                                                <button class="text-xs text-primary hover:text-primary/80 transition-colors"
+                                                        data-event="click:editComment">
+                                                    Edit
+                                                </button>
+                                                <button class="text-xs text-destructive hover:text-destructive/80 transition-colors"
+                                                        data-event="click:deleteComment">
+                                                    Delete
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Comment 2 (Anonymous) -->
+                            <div class="bg-secondary rounded-lg p-4">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-10 h-10 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                                        <i class="fas fa-user text-muted-foreground"></i>
+                                    </div>
+                                    
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-2 mb-2">
+                                            <span class="font-medium text-foreground text-sm">Anonymous</span>
+                                            <div class="rating-stars text-xs">
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star"></i>
+                                                <i class="fas fa-star rating-star"></i>
+                                                <span class="text-muted-foreground ml-1">7</span>
+                                            </div>
+                                            <span class="text-xs text-muted-foreground">5 hours ago</span>
+                                        </div>
+                                        
+                                        <p class="text-foreground text-sm leading-relaxed mb-3">
+                                            Good album but feels a bit repetitive after track 6. The artist's previous work was more experimental.
+                                        </p>
+                                        
+                                        <div class="flex items-center space-x-4">
+                                            <button class="flex items-center space-x-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                                <i class="fas fa-thumbs-up"></i>
+                                                <span>3</span>
+                                            </button>
+                                            <button class="flex items-center space-x-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                                <i class="fas fa-thumbs-down"></i>
+                                                <span>8</span>
+                                            </button>
+                                            <button class="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                                <i class="fas fa-flag mr-1"></i>
+                                                Report
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Comment 3 -->
+                            <div class="bg-secondary rounded-lg p-4">
+                                <div class="flex items-start space-x-4">
+                                    <div class="w-10 h-10 bg-accent rounded-full flex items-center justify-center flex-shrink-0">
+                                        <span class="text-accent-foreground font-semibold text-sm">AS</span>
+                                    </div>
+                                    
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-2 mb-2">
+                                            <span class="font-medium text-foreground text-sm">AudioSnob</span>
+                                            <div class="rating-stars text-xs">
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <i class="fas fa-star rating-star active"></i>
+                                                <span class="text-muted-foreground ml-1">10</span>
+                                            </div>
+                                            <span class="text-xs text-muted-foreground">1 week ago</span>
+                                        </div>
+                                        
+                                        <p class="text-foreground text-sm leading-relaxed mb-3">
+                                            Masterpiece. This is what electronic music should sound like in 2024. Every element is perfectly crafted and the emotional journey is incredible. Album of the year candidate for sure.
+                                        </p>
+                                        
+                                        <div class="flex items-center space-x-4">
+                                            <button class="flex items-center space-x-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                                <i class="fas fa-thumbs-up"></i>
+                                                <span>24</span>
+                                            </button>
+                                            <button class="flex items-center space-x-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                                <i class="fas fa-thumbs-down"></i>
+                                                <span>2</span>
+                                            </button>
+                                            <button class="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                                                <i class="fas fa-flag mr-1"></i>
+                                                Report
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+
+                            <!-- Load More Comments -->
+                            <div class="text-center">
+                                <button class="bg-muted text-muted-foreground px-6 py-2 rounded-lg hover:bg-muted/80 transition-colors"
+                                        data-event="click:loadMoreComments">
+                                    Load More Comments
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: ReleaseDetailPage -->
+        </section>
+
+        <!-- Section Divider -->
+        <div class="section-divider mb-12"></div>
+
+        <!-- User Profile Demo -->
+        <section class="mb-12">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-accent mb-2">User Profile Demo</h2>
+                <p class="text-muted-foreground">Profile page showing user ratings and comments</p>
+            </div>
+
+            <!-- @COMPONENT: UserProfile -->
+            <div class="bg-card rounded-xl border border-border p-6 md:p-8">
+                <!-- Profile Header -->
+                <div class="flex items-center space-x-6 mb-8">
+                    <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+                        <span class="text-primary-foreground font-bold text-xl" data-bind="user.initials">MJ</span>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-foreground" data-bind="user.nickname">MusicJunkie92</h1>
+                        <p class="text-muted-foreground" data-bind="user.joinDate">Joined December 2023</p>
+                        <div class="flex items-center space-x-4 mt-2">
+                            <span class="text-sm text-muted-foreground">
+                                <span class="font-semibold text-foreground" data-bind="user.totalRatings">47</span> Ratings
+                            </span>
+                            <span class="text-sm text-muted-foreground">
+                                <span class="font-semibold text-foreground" data-bind="user.totalComments">23</span> Reviews
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Tabs -->
+                <div class="border-b border-border mb-6">
+                    <nav class="flex space-x-8">
+                        <button class="pb-2 border-b-2 border-primary text-primary font-medium text-sm"
+                                data-tab="ratings">
+                            Recent Ratings
+                        </button>
+                        <button class="pb-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground font-medium text-sm"
+                                data-tab="reviews">
+                            Reviews
+                        </button>
+                    </nav>
+                </div>
+
+                <!-- Recent Ratings -->
+                <div class="space-y-4" data-tab-content="ratings">
+                    <!-- @MAP: userRatings.map(rating => ( -->
+                    <div class="flex items-center space-x-4 p-4 bg-secondary rounded-lg">
+                        <!-- Album cover for user's rated release -->
+                        <img src="https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?ixlib=rb-4.0.3&auto=format&fit=crop&w=60&h=60" 
+                             alt="Album Cover" 
+                             class="w-12 h-12 rounded-md flex-shrink-0"
+                             data-bind="rating.release.coverUrl"
+                             data-mock-image="true">
+                        
+                        <div class="flex-1">
+                            <h4 class="font-medium text-foreground text-sm" data-bind="rating.release.title">Midnight Dreams</h4>
+                            <p class="text-muted-foreground text-xs" data-bind="rating.release.artist">The Neon Collective</p>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <div class="rating-stars text-xs">
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <i class="fas fa-star rating-star active"></i>
+                                <span class="text-muted-foreground ml-1" data-bind="rating.score">9</span>
+                            </div>
+                            <span class="text-xs text-muted-foreground" data-bind="rating.createdAt">2 days ago</span>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+
+                    <div class="text-center">
+                        <button class="text-primary hover:text-primary/80 text-sm font-medium"
+                                data-event="click:loadMoreRatings">
+                            View All Ratings
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: UserProfile -->
+        </section>
+
+        <!-- Section Divider -->
+        <div class="section-divider mb-12"></div>
+
+        <!-- Admin Panel Demo -->
+        <section class="mb-12">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-destructive mb-2">Admin Panel Demo</h2>
+                <p class="text-muted-foreground">Administrative interface for content moderation</p>
+            </div>
+
+            <!-- @COMPONENT: AdminPanel -->
+            <div class="bg-card rounded-xl border border-border p-6 md:p-8">
+                <!-- Admin Navigation -->
+                <div class="flex flex-wrap gap-4 mb-6">
+                    <button class="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium">
+                        Manage Releases
+                    </button>
+                    <button class="bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary/80">
+                        Reported Comments
+                    </button>
+                    <button class="bg-secondary text-secondary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-secondary/80">
+                        User Management
+                    </button>
+                </div>
+
+                <!-- Reported Comments Section -->
+                <div class="space-y-4">
+                    <h3 class="text-lg font-semibold text-foreground mb-4 flex items-center">
+                        <i class="fas fa-exclamation-triangle mr-2 text-destructive"></i>
+                        Pending Reports
+                    </h3>
+
+                    <!-- Reported Comment -->
+                    <div class="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                        <div class="flex items-start justify-between mb-3">
+                            <div>
+                                <span class="font-medium text-foreground text-sm">Reported Comment</span>
+                                <span class="text-xs text-muted-foreground ml-2">on "Thunder & Lightning"</span>
+                            </div>
+                            <span class="text-xs text-destructive font-medium">3 reports</span>
+                        </div>
+                        
+                        <p class="text-sm text-foreground bg-secondary rounded p-3 mb-4 italic">
+                            "This album is garbage and the artist should quit music..."
+                        </p>
+                        
+                        <div class="flex items-center space-x-3">
+                            <button class="bg-destructive text-destructive-foreground px-4 py-1.5 rounded text-xs font-medium hover:bg-destructive/90"
+                                    data-event="click:deleteComment">
+                                Delete Comment
+                            </button>
+                            <button class="bg-muted text-muted-foreground px-4 py-1.5 rounded text-xs font-medium hover:bg-muted/80"
+                                    data-event="click:dismissReport">
+                                Dismiss Report
+                            </button>
+                            <button class="text-primary hover:text-primary/80 text-xs font-medium"
+                                    data-event="click:viewUserProfile">
+                                View User Profile
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Add Release Form -->
+                    <div class="bg-secondary rounded-lg p-6 mt-8">
+                        <h3 class="text-lg font-semibold text-foreground mb-4">Add New Release</h3>
+                        
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-medium text-foreground mb-2">Release Title</label>
+                                <input type="text" 
+                                       placeholder="Enter album/single title"
+                                       class="w-full px-3 py-2 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground placeholder-muted-foreground">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-foreground mb-2">Artist Name</label>
+                                <input type="text" 
+                                       placeholder="Enter artist name"
+                                       class="w-full px-3 py-2 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground placeholder-muted-foreground">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-foreground mb-2">Release Date</label>
+                                <input type="date" 
+                                       class="w-full px-3 py-2 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-foreground mb-2">Cover Image URL</label>
+                                <input type="url" 
+                                       placeholder="https://..."
+                                       class="w-full px-3 py-2 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground placeholder-muted-foreground">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <label class="block text-sm font-medium text-foreground mb-2">Streaming Links</label>
+                            <div class="grid sm:grid-cols-2 gap-3">
+                                <input type="url" 
+                                       placeholder="Spotify URL"
+                                       class="px-3 py-2 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground placeholder-muted-foreground">
+                                <input type="url" 
+                                       placeholder="Apple Music URL"
+                                       class="px-3 py-2 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground placeholder-muted-foreground">
+                            </div>
+                        </div>
+                        
+                        <button class="mt-6 bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                                data-event="click:addRelease">
+                            Add Release
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: AdminPanel -->
+        </section>
+    </main>
+
+    <!-- @COMPONENT: Footer -->
+    <footer class="bg-card border-t border-border">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid md:grid-cols-4 gap-8">
+                <div class="md:col-span-1">
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-8 h-8 bg-gradient-to-r from-primary to-accent rounded-lg flex items-center justify-center">
+                            <i class="fas fa-music text-primary-foreground text-sm"></i>
+                        </div>
+                        <span class="text-xl font-bold text-foreground">MusicReview</span>
+                    </div>
+                    <p class="text-muted-foreground text-sm">
+                        The ultimate platform for music discovery and community reviews.
+                    </p>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold text-foreground mb-3 text-sm">Explore</h3>
+                    <ul class="space-y-2 text-sm text-muted-foreground">
+                        <li><a href="#" class="hover:text-foreground transition-colors">New Releases</a></li>
+                        <li><a href="#" class="hover:text-foreground transition-colors">Top Rated</a></li>
+                        <li><a href="#" class="hover:text-foreground transition-colors">Artists</a></li>
+                        <li><a href="#" class="hover:text-foreground transition-colors">Genres</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold text-foreground mb-3 text-sm">Community</h3>
+                    <ul class="space-y-2 text-sm text-muted-foreground">
+                        <li><a href="#" class="hover:text-foreground transition-colors">Guidelines</a></li>
+                        <li><a href="#" class="hover:text-foreground transition-colors">Support</a></li>
+                        <li><a href="#" class="hover:text-foreground transition-colors">Contact</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="font-semibold text-foreground mb-3 text-sm">Connect</h3>
+                    <div class="flex space-x-3">
+                        <a href="#" class="text-muted-foreground hover:text-primary transition-colors">
+                            <i class="fab fa-twitter"></i>
+                        </a>
+                        <a href="#" class="text-muted-foreground hover:text-primary transition-colors">
+                            <i class="fab fa-instagram"></i>
+                        </a>
+                        <a href="#" class="text-muted-foreground hover:text-primary transition-colors">
+                            <i class="fab fa-discord"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-8 pt-6 border-t border-border text-center">
+                <p class="text-muted-foreground text-xs">
+                    © 2024 MusicReview. All rights reserved.
+                </p>
+            </div>
+        </div>
+    </footer>
+    <!-- @END_COMPONENT: Footer -->
+
+    <!-- Authentication Modal (shown when signing in) -->
+    <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 hidden" 
+         id="auth-modal" 
+         data-show-when="showAuthModal">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-card rounded-xl border border-border p-8 w-full max-w-md">
+                <div class="text-center mb-6">
+                    <div class="w-16 h-16 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-music text-primary-foreground text-xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-foreground mb-2">Welcome to MusicReview</h2>
+                    <p class="text-muted-foreground text-sm">Sign in to rate music and join the conversation</p>
+                </div>
+
+                <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors flex items-center justify-center space-x-2"
+                        data-event="click:handleGoogleAuth">
+                    <i class="fab fa-google"></i>
+                    <span>Continue with Google</span>
+                </button>
+
+                <p class="text-center text-xs text-muted-foreground mt-4">
+                    By signing in, you agree to our Terms of Service and Privacy Policy.
+                </p>
+
+                <button class="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
+                        data-event="click:closeAuthModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nickname Selection Modal (shown for new users) -->
+    <div class="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 hidden" 
+         id="nickname-modal" 
+         data-show-when="showNicknameModal">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-card rounded-xl border border-border p-8 w-full max-w-md">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold text-foreground mb-2">Choose Your Nickname</h2>
+                    <p class="text-muted-foreground text-sm">This will be your display name in the community</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-foreground mb-2">Nickname</label>
+                        <input type="text" 
+                               placeholder="Enter unique nickname"
+                               class="w-full px-3 py-2 bg-input border border-border rounded-lg focus:ring-2 focus:ring-ring text-foreground placeholder-muted-foreground"
+                               data-implementation="Real-time uniqueness validation">
+                        <p class="text-xs text-muted-foreground mt-1">Must be unique and 3-20 characters</p>
+                    </div>
+
+                    <button class="w-full bg-primary text-primary-foreground py-3 rounded-lg font-medium hover:bg-primary/90 transition-colors"
+                            data-event="click:submitNickname">
+                        Complete Registration
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading States and Skeletons -->
+    <div class="hidden" data-show-when="loading">
+        <!-- @COMPONENT: LoadingSkeleton -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <div class="animate-pulse">
+                    <div class="bg-muted rounded-lg aspect-square mb-3"></div>
+                    <div class="bg-muted h-4 rounded mb-2"></div>
+                    <div class="bg-muted h-3 rounded w-3/4"></div>
+                </div>
+                <!-- Repeat skeleton cards as needed -->
+            </div>
+        </div>
+        <!-- @END_COMPONENT: LoadingSkeleton -->
+    </div>
+
+    <script>
+    // TODO: Implement business logic, API calls, and state management
+    (function() {
+        // Interactive rating system
+        function initializeRating() {
+            const ratingContainers = document.querySelectorAll('.rating-stars');
+            
+            ratingContainers.forEach(container => {
+                const stars = container.querySelectorAll('.rating-star');
+                
+                stars.forEach((star, index) => {
+                    star.addEventListener('click', function() {
+                        // TODO: Submit rating to API
+                        console.log(`Rating: ${index + 1}`);
+                        
+                        // Visual feedback
+                        stars.forEach((s, i) => {
+                            if (i <= index) {
+                                s.classList.add('active');
+                            } else {
+                                s.classList.remove('active');
+                            }
+                        });
+                    });
+                });
+            });
+        }
+
+        // Modal controls
+        function initializeModals() {
+            const authModal = document.getElementById('auth-modal');
+            const nicknameModal = document.getElementById('nickname-modal');
+            
+            // Demo: Show auth modal on sign in click
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('[data-event*="handleGoogleAuth"]')) {
+                    e.preventDefault();
+                    // TODO: Integrate with Google OAuth
+                    authModal.classList.remove('hidden');
+                }
+                
+                if (e.target.closest('[data-event*="closeAuthModal"]')) {
+                    authModal.classList.add('hidden');
+                }
+                
+                if (e.target.closest('[data-event*="submitNickname"]')) {
+                    e.preventDefault();
+                    // TODO: Validate nickname uniqueness and complete registration
+                    nicknameModal.classList.add('hidden');
+                }
+            });
+        }
+
+        // Tab switching
+        function initializeTabs() {
+            document.addEventListener('click', function(e) {
+                if (e.target.hasAttribute('data-tab')) {
+                    e.preventDefault();
+                    const tabName = e.target.getAttribute('data-tab');
+                    
+                    // Update tab appearance
+                    const tabs = document.querySelectorAll('[data-tab]');
+                    tabs.forEach(tab => {
+                        tab.classList.remove('border-primary', 'text-primary');
+                        tab.classList.add('border-transparent', 'text-muted-foreground');
+                    });
+                    
+                    e.target.classList.add('border-primary', 'text-primary');
+                    e.target.classList.remove('border-transparent', 'text-muted-foreground');
+                    
+                    // TODO: Load corresponding tab content
+                    console.log(`Loading tab: ${tabName}`);
+                }
+            });
+        }
+
+        // Comment interactions
+        function initializeComments() {
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('[data-event*="likeComment"]')) {
+                    e.preventDefault();
+                    // TODO: Submit like to API and update count
+                    console.log('Like comment');
+                }
+                
+                if (e.target.closest('[data-event*="dislikeComment"]')) {
+                    e.preventDefault();
+                    // TODO: Submit dislike to API and update count
+                    console.log('Dislike comment');
+                }
+                
+                if (e.target.closest('[data-event*="reportComment"]')) {
+                    e.preventDefault();
+                    // TODO: Submit report to admin API
+                    console.log('Report comment');
+                }
+            });
+        }
+
+        // Initialize all interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeRating();
+            initializeModals();
+            initializeTabs();
+            initializeComments();
+        });
+    })();
+    </script>
+</body>
+</html>

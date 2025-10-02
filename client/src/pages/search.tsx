@@ -11,7 +11,7 @@ import { Music, Search as SearchIcon, ArrowUpDown } from "lucide-react";
 export default function Search() {
   const [location, setLocation] = useLocation();
   const [query, setQuery] = useState("");
-  const [sortBy, setSortBy] = useState<string>("");
+  const [sortBy, setSortBy] = useState<string>("date_desc");
   
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -20,9 +20,7 @@ export default function Search() {
     if (q) {
       setQuery(q);
     }
-    if (sort) {
-      setSortBy(sort);
-    }
+    setSortBy(sort || "date_desc");
   }, [location]);
 
   const { data: releaseResults = [], isLoading: isLoadingReleases } = useQuery({

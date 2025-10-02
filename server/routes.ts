@@ -1,10 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { massImportService } from "./music-import";
-import { scheduleDaily, stopScheduler, getSchedulerStatus, runDailyMusicImport, scheduleWeeklyReleaseDateUpdate } from "./scheduler";
-import { musicAPI } from "./combined-music-api";
+import { setupAuth, isAuthenticated } from "./googleAuth";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { 
@@ -387,6 +384,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import endpoints (MTS/Zvuk parsing and Deezer/iTunes API)
+  app.get('/api/import/stats', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const stats = await storage.getImportStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error getting import stats:", error);
+      res.status(500).json({ message: "Failed to get import stats" });
+    }
+  });
+
+  app.post('/api/import/test-playlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+      const { playlistUrl } = req.body;
+      if (!playlistUrl || typeof playlistUrl !== 'string') {
+        return res.status(400).json({ message: "Playlist URL is required" });
+      }
+      const musicImporter = await import('./music-importer');
+      const result = await musicImporter.importFromRussianPlaylist(playlistUrl);
+      res.json({ success: true, stats: result });
+    } catch (error: any) {
+      console.error("Error testing playlist import:", error);
+      res.status(500).json({ message: error.message || "Failed to import playlist" });
+    }
+  });
+
+  app.post('/api/import/update-artists', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+      const musicImporter = await import('./music-importer');
+      const result = await musicImporter.updateExistingArtists();
+      res.json({ success: true, stats: result });
+    } catch (error: any) {
+      console.error("Error updating artists:", error);
+      res.status(500).json({ message: error.message || "Failed to update artists" });
+    }
+  });
+
+  // Background Import Jobs
+  app.post('/api/import/background-playlist', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+      const { playlistUrl } = req.body;
+      if (!playlistUrl || typeof playlistUrl !== 'string') {
+        return res.status(400).json({ message: "Playlist URL is required" });
+      }
+      const backgroundJobs = await import('./background-jobs');
+      const jobId = await backgroundJobs.createImportJob({
+        playlistUrl,
+        status: 'pending',
+        createdBy: userId,
+      });
+      res.json({ success: true, jobId, message: 'Background import job created. Use /api/import/jobs to check progress.' });
+    } catch (error: any) {
+      console.error("Error creating background import job:", error);
+      res.status(500).json({ message: error.message || "Failed to create background import job" });
+    }
+  });
+
+  app.get('/api/import/jobs', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+      const backgroundJobs = await import('./background-jobs');
+      const jobs = await backgroundJobs.getAllImportJobs(userId);
+      res.json(jobs);
+    } catch (error: any) {
+      console.error("Error fetching import jobs:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch import jobs" });
+    }
+  });
+
+  app.get('/api/import/jobs/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) {
+        return res.status(400).json({ message: "Invalid job ID" });
+      }
+      const backgroundJobs = await import('./background-jobs');
+      const job = await backgroundJobs.getImportJob(jobId);
+      if (!job) {
+        return res.status(404).json({ message: "Job not found" });
+      }
+      res.json(job);
+    } catch (error: any) {
+      console.error("Error fetching import job:", error);
+      res.status(500).json({ message: error.message || "Failed to fetch import job" });
+    }
+  });
+
+  app.post('/api/import/jobs/:id/cancel', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Access denied. Admin rights required." });
+      }
+      const jobId = parseInt(req.params.id);
+      if (isNaN(jobId)) {
+        return res.status(400).json({ message: "Invalid job ID" });
+      }
+      const backgroundJobs = await import('./background-jobs');
+      const cancelled = await backgroundJobs.cancelImportJob(jobId);
+      if (!cancelled) {
+        return res.status(404).json({ message: "Job not found or already completed" });
+      }
+      res.json({ success: true, message: "Job cancelled" });
+    } catch (error: any) {
+      console.error("Error cancelling import job:", error);
+      res.status(500).json({ message: error.message || "Failed to cancel import job" });
+    }
+  });
+
+  // Import Logs endpoints
+  app.get('/api/import-logs', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+      const logs = await storage.getImportLogs(limit);
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching import logs:", error);
+      res.status(500).json({ message: "Failed to fetch import logs" });
+    }
+  });
+
+  app.get('/api/import-logs/latest', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user?.isAdmin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const latestLog = await storage.getLatestImportLog();
+      res.json(latestLog || null);
+    } catch (error) {
+      console.error("Error fetching latest import log:", error);
+      res.status(500).json({ message: "Failed to fetch latest import log" });
+    }
+  });
   // Reports routes
   app.post('/api/comments/:id/report', isAuthenticated, async (req: any, res) => {
     try {
@@ -516,268 +683,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Yandex Music Import Stats
-  app.get('/api/import/stats', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
+  // Import features removed
 
-      const stats = await storage.getImportStats();
-      res.json(stats);
-    } catch (error) {
-      console.error("Error getting import stats:", error);
-      res.status(500).json({ message: "Failed to get import stats" });
-    }
-  });
+  
 
-  // Test Yandex Music Playlist Import
-  app.post('/api/import/test-playlist', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
+  
 
-      const { playlistUrl } = req.body;
-      if (!playlistUrl || typeof playlistUrl !== 'string') {
-        return res.status(400).json({ message: "Playlist URL is required" });
-      }
+  
 
-      if (!playlistUrl.includes('music.mts.ru') && !playlistUrl.includes('music.yandex.ru')) {
-        return res.status(400).json({ message: "Invalid playlist URL - supported: MTS Music, Yandex Music" });
-      }
+  
 
-      // Import from playlist using the music importer
-      const musicImporter = await import('./music-importer');
-      const result = await musicImporter.importFromRussianPlaylist(playlistUrl);
-      
-      res.json({
-        success: true,
-        stats: result
-      });
-    } catch (error: any) {
-      console.error("Error testing playlist import:", error);
-      res.status(500).json({ message: error.message || "Failed to import playlist" });
-    }
-  });
-
-  // Update existing artists with new releases
-  app.post('/api/import/update-artists', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      // Update all artists with Spotify IDs
-      const musicImporter = await import('./music-importer');
-      const result = await musicImporter.updateAllArtists();
-      
-      res.json({
-        success: true,
-        stats: result
-      });
-    } catch (error: any) {
-      console.error("Error updating artists:", error);
-      res.status(500).json({ message: error.message || "Failed to update artists" });
-    }
-  });
-
-  // Test single artist API (temporary testing endpoint)
-  app.post('/api/test-single-artist', async (req, res) => {
-    try {
-      const { artistName } = req.body;
-      if (!artistName) {
-        return res.status(400).json({ message: "Artist name is required" });
-      }
-
-      console.log(`🧪 Тестирование артиста: ${artistName}`);
-      
-      // Simple test using combined music API
-      const combinedAPI = await import('./combined-music-api');
-      const musicAPI = new combinedAPI.CombinedMusicAPI();
-      
-      const result = await musicAPI.findArtist(artistName);
-      
-      if (!result) {
-        return res.json({
-          success: false,
-          message: `Artist "${artistName}" not found`,
-          albums: []
-        });
-      }
-      
-      const { artist, albums } = result;
-      
-      res.json({
-        success: true,
-        artist: {
-          name: artist.name,
-          source: artist.source,
-          id: artist.id
-        },
-        albums: albums.map(album => ({
-          title: album.title,
-          releaseDate: album.releaseDate,
-          type: album.albumType,
-          id: album.id
-        })),
-        totalAlbums: albums.length,
-        message: `Found ${albums.length} albums for ${artist.name}`
-      });
-    } catch (error: any) {
-      console.error("Error testing artist:", error);
-      res.status(500).json({ message: error.message || "Failed to test artist" });
-    }
-  });
-
-  // Manual Daily Import Trigger - for testing
-  app.post('/api/import/manual-daily', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      console.log('🎯 Администратор запустил ручной импорт');
-      
-      // Import from scheduled daily import
-      const scheduler = await import('./scheduler');
-      const result = await scheduler.manualImportTrigger();
-      
-      res.json({
-        success: true,
-        stats: result,
-        message: 'Manual daily import completed successfully'
-      });
-    } catch (error: any) {
-      console.error("Error during manual daily import:", error);
-      res.status(500).json({ message: error.message || "Failed to run manual daily import" });
-    }
-  });
-
-  // Background Import Jobs
-  app.post('/api/import/background-playlist', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const { playlistUrl } = req.body;
-      if (!playlistUrl || typeof playlistUrl !== 'string') {
-        return res.status(400).json({ message: "Playlist URL is required" });
-      }
-
-      if (!playlistUrl.includes('music.mts.ru') && !playlistUrl.includes('music.yandex.ru')) {
-        return res.status(400).json({ message: "Invalid playlist URL - supported: MTS Music, Yandex Music" });
-      }
-
-      // Create background import job
-      const backgroundJobs = await import('./background-jobs');
-      const jobId = await backgroundJobs.createImportJob({
-        playlistUrl,
-        status: 'pending',
-        createdBy: userId,
-      });
-      
-      res.json({
-        success: true,
-        jobId,
-        message: 'Background import job created. Use /api/import/jobs to check progress.'
-      });
-    } catch (error: any) {
-      console.error("Error creating background import job:", error);
-      res.status(500).json({ message: error.message || "Failed to create background import job" });
-    }
-  });
-
-  app.get('/api/import/jobs', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const backgroundJobs = await import('./background-jobs');
-      const jobs = await backgroundJobs.getAllImportJobs(userId);
-      
-      res.json(jobs);
-    } catch (error: any) {
-      console.error("Error fetching import jobs:", error);
-      res.status(500).json({ message: error.message || "Failed to fetch import jobs" });
-    }
-  });
-
-  app.get('/api/import/jobs/:id', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const jobId = parseInt(req.params.id);
-      if (isNaN(jobId)) {
-        return res.status(400).json({ message: "Invalid job ID" });
-      }
-
-      const backgroundJobs = await import('./background-jobs');
-      const job = await backgroundJobs.getImportJob(jobId);
-      
-      if (!job) {
-        return res.status(404).json({ message: "Job not found" });
-      }
-
-      res.json(job);
-    } catch (error: any) {
-      console.error("Error fetching import job:", error);
-      res.status(500).json({ message: error.message || "Failed to fetch import job" });
-    }
-  });
-
-  app.post('/api/import/jobs/:id/cancel', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const jobId = parseInt(req.params.id);
-      if (isNaN(jobId)) {
-        return res.status(400).json({ message: "Invalid job ID" });
-      }
-
-      const backgroundJobs = await import('./background-jobs');
-      const cancelled = await backgroundJobs.cancelImportJob(jobId);
-      
-      if (!cancelled) {
-        return res.status(404).json({ message: "Job not found or already completed" });
-      }
-
-      res.json({ success: true, message: "Job cancelled" });
-    } catch (error: any) {
-      console.error("Error cancelling import job:", error);
-      res.status(500).json({ message: error.message || "Failed to cancel import job" });
-    }
-  });
+  
 
   // User profile routes
   app.get('/api/users/:id/ratings', async (req, res) => {
@@ -1066,99 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Automatic Scheduler Management Endpoints
   
-  // Get scheduler status
-  app.get('/api/scheduler/status', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const status = getSchedulerStatus();
-      res.json(status);
-    } catch (error) {
-      console.error("Error getting scheduler status:", error);
-      res.status(500).json({ message: "Failed to get scheduler status" });
-    }
-  });
-
-  // Start automatic scheduler
-  app.post('/api/scheduler/start', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const schedulerInfo = scheduleDaily();
-      
-      // Также запускаем еженедельное обновление дат релизов
-      scheduleWeeklyReleaseDateUpdate();
-      
-      res.json({
-        success: true,
-        message: "Автоматический планировщик запущен",
-        ...schedulerInfo
-      });
-    } catch (error) {
-      console.error("Error starting scheduler:", error);
-      res.status(500).json({ message: "Failed to start scheduler" });
-    }
-  });
-
-  // Stop automatic scheduler
-  app.post('/api/scheduler/stop', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      const stopped = stopScheduler();
-      res.json({
-        success: stopped,
-        message: stopped ? "Автоматический планировщик остановлен" : "Планировщик уже был остановлен"
-      });
-    } catch (error) {
-      console.error("Error stopping scheduler:", error);
-      res.status(500).json({ message: "Failed to stop scheduler" });
-    }
-  });
-
-  // Manually trigger daily import
-  app.post('/api/scheduler/trigger', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Access denied. Admin rights required." });
-      }
-
-      // Run in background to avoid timeout
-      runDailyMusicImport().then(stats => {
-        console.log('📊 Ручной импорт завершен:', stats);
-      }).catch(error => {
-        console.error('❌ Ошибка ручного импорта:', error);
-      });
-
-      res.json({
-        success: true,
-        message: "Ежедневный импорт запущен в фоне. Проверьте логи сервера для отслеживания прогресса."
-      });
-    } catch (error) {
-      console.error("Error triggering manual import:", error);
-      res.status(500).json({ message: "Failed to trigger manual import" });
-    }
-  });
 
   // Auto Import Playlists management (Admin only)
   app.get('/api/auto-import-playlists', isAuthenticated, async (req: any, res) => {
@@ -1243,39 +1067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Import Logs endpoints
-  app.get('/api/import-logs', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
-      const logs = await storage.getImportLogs(limit);
-      res.json(logs);
-    } catch (error) {
-      console.error("Error fetching import logs:", error);
-      res.status(500).json({ message: "Failed to fetch import logs" });
-    }
-  });
-
-  app.get('/api/import-logs/latest', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      if (!user?.isAdmin) {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
-      const latestLog = await storage.getLatestImportLog();
-      res.json(latestLog || null);
-    } catch (error) {
-      console.error("Error fetching latest import log:", error);
-      res.status(500).json({ message: "Failed to fetch latest import log" });
-    }
-  });
+  
 
 
   const httpServer = createServer(app);
