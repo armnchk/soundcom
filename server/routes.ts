@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./googleAuth";
+import passport from "passport";
 import { db } from "./db";
 import { sql } from "drizzle-orm";
 import { 
@@ -23,6 +24,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Auth routes
+  app.get('/api/auth/google', passport.authenticate('google', {
+    scope: ['profile', 'email']
+  }));
+
+  app.get('/api/callback', passport.authenticate('google', {
+    failureRedirect: '/login'
+  }), (req: any, res) => {
+    // Successful authentication, redirect to home
+    res.redirect('/');
+  });
+
+  app.get('/api/auth/logout', (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return res.status(500).json({ message: 'Logout failed' });
+      }
+      res.redirect('/');
+    });
+  });
+
+  // Test endpoint to check session
+  app.get('/api/test-session', (req: any, res) => {
+    res.json({
+      session: req.session,
+      user: req.user,
+      isAuthenticated: req.isAuthenticated ? req.isAuthenticated() : false
+    });
+  });
+
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
       // Отключаем кэширование
@@ -38,7 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: req.user.claims.first_name || req.user.claims.given_name || '',
         lastName: req.user.claims.last_name || req.user.claims.family_name || '',
         profileImageUrl: req.user.claims.picture || null,
-        isAdmin: req.user.is_admin || false,
+        is_admin: req.user.is_admin || false,
         nickname: req.user.nickname || null
       };
       res.json(user);
@@ -195,6 +226,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin releases endpoint with filters and pagination
+  app.get('/api/admin/releases', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const {
+        page = 1,
+        limit = 50,
+        search = '',
+        type = '',
+        artist = '',
+        sortBy = 'created_at',
+        sortOrder = 'desc',
+        showTestData = false
+      } = req.query;
+
+      const params = {
+        page: parseInt(page as string),
+        limit: parseInt(limit as string),
+        search: search as string,
+        type: type as string,
+        artist: artist as string,
+        sortBy: sortBy as string,
+        sortOrder: sortOrder as 'asc' | 'desc',
+        showTestData: showTestData === 'true'
+      };
+
+      const result = await storage.getReleasesWithFilters(params);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching admin releases:", error);
+      res.status(500).json({ message: "Failed to fetch releases" });
+    }
+  });
+
   // Search routes
   app.get('/api/search', async (req, res) => {
     try {
@@ -277,7 +346,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const releaseId = parseInt(req.params.id);
       const { sortBy } = req.query;
+      console.log('Fetching comments for release:', releaseId, 'sortBy:', sortBy);
       const comments = await storage.getComments(releaseId, sortBy as 'date' | 'rating' | 'likes');
+      console.log('Comments fetched:', comments.length);
       res.json(comments);
     } catch (error) {
       console.error("Error fetching comments:", error);
@@ -285,41 +356,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/releases/:id/tracks', async (req, res) => {
+    try {
+      const releaseId = parseInt(req.params.id);
+      const tracks = await storage.getReleaseTracks(releaseId);
+      res.json(tracks);
+    } catch (error) {
+      console.error("Error fetching tracks:", error);
+      res.status(500).json({ message: "Failed to fetch tracks" });
+    }
+  });
+
   app.post('/api/releases/:id/comments', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const releaseId = parseInt(req.params.id);
-      const { text, rating, isAnonymous } = req.body;
+      const { text, rating } = req.body;
 
-      if (!text && !rating) {
-        return res.status(400).json({ message: "Either text or rating is required" });
+      console.log('Creating comment:', { userId, releaseId, text, rating });
+
+      // Рейтинг обязателен
+      if (!rating || rating < 1 || rating > 10) {
+        return res.status(400).json({ message: "Rating is required and must be between 1 and 10" });
       }
 
-      if (text && text.length > 1000) {
+      // Текст комментария обязателен
+      if (!text || text.trim().length < 5) {
+        return res.status(400).json({ message: "Comment text is required and must be at least 5 characters long" });
+      }
+
+      if (text.length > 1000) {
         return res.status(400).json({ message: "Comment text cannot exceed 1000 characters" });
       }
 
-      if (rating && (rating < 1 || rating > 10)) {
-        return res.status(400).json({ message: "Rating must be between 1 and 10" });
-      }
-
-      // Check if user already has a comment with rating for this release
-      if (rating && !isAnonymous) {
-        const existingComment = await storage.getUserCommentForRelease(userId, releaseId);
-        if (existingComment && existingComment.rating) {
-          return res.status(400).json({ message: "You have already rated this release" });
-        }
+      // Check if user already has a comment for this release
+      const existingComment = await storage.getUserCommentForRelease(userId, releaseId);
+      if (existingComment) {
+        return res.status(400).json({ message: "You have already commented on this release. You can only edit your existing comment." });
       }
 
       const commentData = {
-        userId: isAnonymous ? null : userId,
-        releaseId,
-        text: text || null,
-        rating: rating || null,
-        isAnonymous: !!isAnonymous,
+        user_id: userId,
+        release_id: releaseId,
+        text: text.trim(),
+        rating: rating,
       };
 
+      console.log('Comment data:', commentData);
+
       const comment = await storage.createComment(commentData);
+      console.log('Comment created:', comment);
       res.status(201).json(comment);
     } catch (error) {
       console.error("Error creating comment:", error);
@@ -333,15 +419,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const commentId = parseInt(req.params.id);
       const { text, rating } = req.body;
 
-      if (text && text.length > 1000) {
+      // Рейтинг обязателен
+      if (!rating || rating < 1 || rating > 10) {
+        return res.status(400).json({ message: "Rating is required and must be between 1 and 10" });
+      }
+
+      // Текст комментария обязателен
+      if (!text || text.trim().length < 5) {
+        return res.status(400).json({ message: "Comment text is required and must be at least 5 characters long" });
+      }
+
+      if (text.length > 1000) {
         return res.status(400).json({ message: "Comment text cannot exceed 1000 characters" });
       }
 
-      if (rating && (rating < 1 || rating > 10)) {
-        return res.status(400).json({ message: "Rating must be between 1 and 10" });
-      }
-
-      const comment = await storage.updateComment(commentId, { text, rating });
+      const comment = await storage.updateComment(commentId, { text: text.trim(), rating: rating });
       res.json(comment);
     } catch (error) {
       console.error("Error updating comment:", error);
@@ -666,13 +758,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Collection routes
   app.get('/api/collections', async (req, res) => {
     try {
+      // Отключаем кэширование
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+      
       const activeOnly = req.query.activeOnly !== 'false';
       const collections = await storage.getCollections(activeOnly);
-      // Sort by sortOrder, then by id for stable sorting when sortOrder is the same
+      // Sort by sort_order, then by id for stable sorting when sort_order is the same
       const sortedCollections = collections.sort((a, b) => {
-        const sortOrderDiff = (a.sortOrder || 0) - (b.sortOrder || 0);
+        const sortOrderDiff = (a.sort_order || 0) - (b.sort_order || 0);
         if (sortOrderDiff !== 0) return sortOrderDiff;
-        // If sortOrder is the same, sort by id (ascending = earlier created first)
+        // If sort_order is the same, sort by id (ascending = earlier created first)
         return a.id - b.id;
       });
       res.json(sortedCollections);
@@ -878,14 +975,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
       
+      console.log("Creating collection with data:", req.body);
       const collection = await storage.createCollection({
         ...req.body,
-        userId: userId
+        user_id: req.user.id
       });
+      console.log("Collection created successfully:", collection);
       res.json(collection);
     } catch (error) {
       console.error("Error creating collection:", error);
+      console.error("Error details:", error.message);
       res.status(500).json({ message: "Failed to create collection" });
+    }
+  });
+
+  app.put('/api/admin/collections/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      // Проверяем админские права из сессии
+      if (!req.user?.is_admin) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      
+      const collectionId = parseInt(req.params.id);
+      const updates = req.body;
+      
+      // If trying to activate, check minimum releases requirement
+      if (updates.is_active === true) {
+        const collection = await storage.getCollection(collectionId);
+        if (!collection || (collection.releases?.length || 0) < 5) {
+          return res.status(400).json({ 
+            message: "Collection must have at least 5 releases to be activated" 
+          });
+        }
+      }
+      
+      const updatedCollection = await storage.updateCollection(collectionId, updates);
+      res.json(updatedCollection);
+    } catch (error) {
+      console.error("Error updating collection:", error);
+      res.status(500).json({ message: "Failed to update collection" });
     }
   });
 

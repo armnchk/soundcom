@@ -1,0 +1,1 @@
+ALTER TABLE "collections" ADD COLUMN "is_public" boolean DEFAULT true;

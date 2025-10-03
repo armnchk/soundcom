@@ -13,7 +13,8 @@ interface CommentItemProps {
     text?: string;
     rating?: number;
     isAnonymous: boolean;
-    createdAt: string;
+    createdAt?: string;
+    created_at?: string;
     user: {
       id: string;
       nickname: string;
@@ -142,7 +143,7 @@ export function CommentItem({
               </span>
             )}
             <span className="text-xs text-muted-foreground" data-testid="text-date">
-              {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
+              {formatDistanceToNow(new Date(comment.createdAt || comment.created_at || new Date()), { addSuffix: true })}
             </span>
           </div>
           

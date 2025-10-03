@@ -1,12 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CommentItem } from "./comment-item";
 import { CommentForm } from "./comment-form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { Edit } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface CommentBlockProps {
   releaseId: number;
@@ -18,6 +19,8 @@ export function CommentBlock({ releaseId, isAuthenticated, currentUserId }: Comm
   const [sortBy, setSortBy] = useState<'date' | 'rating' | 'likes'>('date');
   const [isEditing, setIsEditing] = useState(false);
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: comments = [], isLoading } = useQuery({
     queryKey: ["/api/releases", releaseId, "comments", { sortBy }],
@@ -29,9 +32,30 @@ export function CommentBlock({ releaseId, isAuthenticated, currentUserId }: Comm
     },
   });
 
-  // Find current user's comment with rating
-  const userComment = comments.find((comment: any) => 
-    comment.userId === user?.id && comment.rating !== null
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: number) => {
+      await apiRequest('DELETE', `/api/comments/${commentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId, "comments"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId] });
+      toast({
+        title: "Оценка удалена",
+        description: "Ваша оценка успешно удалена",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось удалить оценку",
+        variant: "destructive"
+      });
+    },
+  });
+
+  // Find current user's comment
+  const userComment = comments.find((comment: any) =>
+    comment.user_id === user?.id
   );
 
   if (isLoading) {
@@ -74,15 +98,32 @@ export function CommentBlock({ releaseId, isAuthenticated, currentUserId }: Comm
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-foreground">Ваша оценка</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsEditing(true)}
-                    data-testid="button-edit-rating"
-                  >
-                    <Edit className="w-4 h-4 mr-2" />
-                    Редактировать
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsEditing(true)}
+                      data-testid="button-edit-rating"
+                      className="p-2"
+                      title="Редактировать"
+                    >
+                      ✏️
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm("Вы уверены, что хотите удалить свою оценку?")) {
+                          deleteCommentMutation.mutate(userComment.id);
+                        }
+                      }}
+                      disabled={deleteCommentMutation.isPending}
+                      className="p-2 border-red-300 text-red-600 hover:text-red-700 hover:bg-red-50 hover:border-red-400"
+                      title="Удалить оценку"
+                    >
+                      {deleteCommentMutation.isPending ? "..." : "🗑️"}
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
@@ -111,8 +152,7 @@ export function CommentBlock({ releaseId, isAuthenticated, currentUserId }: Comm
                   initialData={userComment ? {
                     id: userComment.id,
                     text: userComment.text,
-                    rating: userComment.rating,
-                    isAnonymous: userComment.isAnonymous
+                    rating: userComment.rating
                   } : undefined}
                   mode={userComment ? 'edit' : 'create'}
                   onSuccess={() => {

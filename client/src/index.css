@@ -366,3 +366,12 @@
   background: rgba(23, 23, 23, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* Hide scrollbar for collection scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar { 
+  display: none;  /* Safari and Chrome */
+}

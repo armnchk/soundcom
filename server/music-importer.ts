@@ -105,19 +105,35 @@ export async function updateArtistWithMusicInfo(artistId: number, artistInfo: an
 
 // Check if release already exists
 async function releaseExists(externalId: string, artistId: number, title: string, source: 'deezer' | 'itunes'): Promise<boolean> {
-  const existing = await db.select()
+  // First check by external ID if available
+  if (externalId) {
+    const existingByExternalId = await db.select()
+      .from(releases)
+      .where(
+        and(
+          eq(releases.artist_id, artistId),
+          source === 'deezer' ? eq(releases.deezer_id, externalId) : eq(releases.itunes_id, externalId)
+        )
+      )
+      .limit(1);
+    
+    if (existingByExternalId.length > 0) {
+      return true;
+    }
+  }
+  
+  // Also check by title to prevent duplicates with different external IDs
+  const existingByTitle = await db.select()
     .from(releases)
     .where(
       and(
         eq(releases.artist_id, artistId),
-        externalId ? 
-          (source === 'deezer' ? eq(releases.deezer_id, externalId) : eq(releases.itunes_id, externalId))
-          : eq(releases.title, title)
+        eq(releases.title, title)
       )
     )
     .limit(1);
     
-  return existing.length > 0;
+  return existingByTitle.length > 0;
 }
 
 // Create release from external album data
@@ -159,6 +175,25 @@ async function createReleaseFromAlbum(album: any, artistId: number, source: 'dee
     });
   }
   
+  // Обрабатываем треки - преобразуем в правильный формат для JSONB
+  let processedTracks = [];
+  if (album.tracks && Array.isArray(album.tracks)) {
+    processedTracks = album.tracks.map((track: any) => ({
+      id: track.id,
+      title: track.title,
+      title_short: track.title_short || track.title,
+      duration: track.duration,
+      rank: track.rank,
+      explicit_lyrics: track.explicit_lyrics || false,
+      preview: track.preview,
+      artist: {
+        id: track.artist?.id,
+        name: track.artist?.name
+      }
+    }));
+  }
+  console.log(`   Processed tracks:`, processedTracks.length, 'tracks');
+  
   const releaseData: any = {
     artist_id: artistId,
     title: album.title,
@@ -176,7 +211,8 @@ async function createReleaseFromAlbum(album: any, artistId: number, source: 'dee
     genres: processedGenres,
     upc: album.upc,
     label: album.label,
-    contributors: processedContributors
+    contributors: processedContributors,
+    tracks: processedTracks
   };
   
   if (album.releaseDate) {
@@ -251,6 +287,16 @@ async function updateReleaseWithAdditionalData(existingRelease: any, album: any,
   }
   if (!existingRelease.label && album.label) {
     updateData.label = album.label;
+  }
+  
+  // Обновляем тип релиза, если его нет или он неправильный
+  if ((!existingRelease.type || existingRelease.type === 'album') && album.albumType) {
+    updateData.type = album.albumType;
+  }
+  
+  // Обновляем дату релиза, если её нет
+  if (!existingRelease.release_date && album.releaseDate) {
+    updateData.release_date = new Date(album.releaseDate);
   }
   
   // Обновляем жанры, если их нет или мало
@@ -392,6 +438,30 @@ export async function processArtist(artistName: string): Promise<{
         skippedReleases = albums.length - albumsToProcess.length;
         
         console.log(`💾 Cache optimization: ${albumsToProcess.length} new albums, ${skippedReleases} cached`);
+      }
+    }
+    
+    // Если основной источник - Deezer, попробуем уточнить даты через iTunes
+    if (artist.source === 'deezer') {
+      console.log(`🍎 Checking iTunes for date updates...`);
+      
+      // Находим релизы без даты релиза
+      const releasesWithoutDate = albumsToProcess.filter(album => !album.releaseDate);
+      
+      if (releasesWithoutDate.length > 0) {
+        console.log(`🍎 Found ${releasesWithoutDate.length} releases without date, checking iTunes...`);
+        
+        // Ищем даты в iTunes
+        const updatedReleases = await musicAPI.findReleasesForDateUpdate(artist.name, releasesWithoutDate);
+        
+        // Обновляем оригинальный массив
+        albumsToProcess = albumsToProcess.map(album => {
+          const updated = updatedReleases.find(updated => updated.id === album.id);
+          return updated || album;
+        });
+        
+        const foundDates = updatedReleases.filter(album => album.releaseDate).length;
+        console.log(`🍎 iTunes: Found dates for ${foundDates} releases`);
       }
     }
     
@@ -687,10 +757,35 @@ export async function updateAllArtists(): Promise<ImportStats> {
 
         const { artist: updatedArtist, albums: discography } = musicResult;
         
+        // Если основной источник - Deezer, попробуем уточнить даты через iTunes
+        let albumsToProcess = discography;
+        if (updatedArtist.source === 'deezer') {
+          console.log(`🍎 Checking iTunes for date updates for ${artist.name}...`);
+          
+          // Находим релизы без даты релиза
+          const releasesWithoutDate = discography.filter(album => !album.releaseDate);
+          
+          if (releasesWithoutDate.length > 0) {
+            console.log(`🍎 Found ${releasesWithoutDate.length} releases without date, checking iTunes...`);
+            
+            // Ищем даты в iTunes
+            const updatedReleases = await musicAPI.findReleasesForDateUpdate(artist.name, releasesWithoutDate);
+            
+            // Обновляем оригинальный массив
+            albumsToProcess = discography.map(album => {
+              const updated = updatedReleases.find(updated => updated.id === album.id);
+              return updated || album;
+            });
+            
+            const foundDates = updatedReleases.filter(album => album.releaseDate).length;
+            console.log(`🍎 iTunes: Found dates for ${foundDates} releases`);
+          }
+        }
+        
         let newReleases = 0;
         let skippedReleases = 0;
 
-        for (const album of discography) {
+        for (const album of albumsToProcess) {
           // Check if release already exists
           if (await releaseExists(album.id, artist.id, album.title, album.source)) {
             skippedReleases++;

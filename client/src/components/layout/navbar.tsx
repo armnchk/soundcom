@@ -42,7 +42,7 @@ export default function Navbar() {
   };
 
   const userInitials = user?.nickname?.substring(0, 2).toUpperCase() || 
-                      user?.firstName?.substring(0, 2).toUpperCase() || "U";
+                      user?.first_name?.substring(0, 2).toUpperCase() || "U";
 
   return (
     <nav className="sticky top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border">
@@ -80,15 +80,15 @@ export default function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2" data-testid="button-user-menu">
                     <Avatar className="w-8 h-8">
-                      {user?.profileImageUrl && (
-                        <AvatarImage src={user.profileImageUrl} alt={user.nickname || 'User'} />
+                      {user?.profile_image_url && (
+                        <AvatarImage src={user.profile_image_url} alt={user.nickname || 'User'} />
                       )}
                       <AvatarFallback className="bg-primary text-primary-foreground text-sm">
                         {userInitials}
                       </AvatarFallback>
                     </Avatar>
                     <span className="hidden sm:inline text-sm font-medium text-white" data-testid="text-username">
-                      {user?.nickname || user?.firstName || 'User'}
+                      {user?.nickname || user?.first_name || 'User'}
                     </span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -97,7 +97,7 @@ export default function Navbar() {
                       <User className="w-4 h-4 mr-2" />
                       Профиль
                   </DropdownMenuItem>
-                  {user?.isAdmin && (
+                  {user?.is_admin && (
                     <DropdownMenuItem onClick={() => setLocation("/admin")} data-testid="button-admin">
                         <Shield className="w-4 h-4 mr-2" />
                         Админ панель

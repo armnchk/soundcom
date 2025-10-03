@@ -83,10 +83,14 @@ export const releases = pgTable("releases", {
   upc: varchar("upc", { length: 50 }), // UPC код
   label: varchar("label", { length: 255 }), // лейбл звукозаписи
   contributors: jsonb("contributors"), // участники (продюсеры, авторы и т.д.)
+  tracks: jsonb("tracks"), // список треков альбома
   is_test_data: boolean("is_test_data").default(false),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  // Unique constraint to prevent duplicate releases by same artist and title
+  uniqueArtistTitle: unique().on(table.artist_id, table.title),
+}));
 
 export const ratings = pgTable("ratings", {
   id: serial("id").primaryKey(),
@@ -101,9 +105,9 @@ export const comments = pgTable("comments", {
   id: serial("id").primaryKey(),
   user_id: varchar("user_id").references(() => users.id),
   release_id: integer("release_id").references(() => releases.id),
-  text: text("text"),
+  content: text("content"),
   rating: integer("rating"),
-  is_anonymous: boolean("is_anonymous").default(false),
+  parent_id: integer("parent_id").references(() => comments.id),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 });
@@ -127,10 +131,12 @@ export const reports = pgTable("reports", {
 
 export const collections = pgTable("collections", {
   id: serial("id").primaryKey(),
+  user_id: varchar("user_id", { length: 255 }).notNull().references(() => users.id),
   title: varchar("title", { length: 255 }).notNull(),
   subtitle: varchar("subtitle", { length: 255 }),
   description: text("description"),
   is_active: boolean("is_active").default(true),
+  is_public: boolean("is_public").default(true),
   sort_order: integer("sort_order").default(0),
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),

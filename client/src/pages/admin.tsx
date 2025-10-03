@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Trash2, X, Shield, Upload, Download, Database, Calendar, User, List, Search, Eye, FolderOpen, Plus, Album } from "lucide-react";
-import { useState } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -35,7 +34,7 @@ export default function Admin() {
   const [releaseSearch, setReleaseSearch] = useState('');
 
   useEffect(() => {
-    if (!authLoading && (!user || !user.isAdmin)) {
+    if (!authLoading && (!user || !user.is_admin)) {
       toast({
         title: "Не авторизован",
         description: "У вас нет прав доступа к админ-панели.",
@@ -56,7 +55,7 @@ export default function Admin() {
 
   const { data: reports = [] } = useQuery({
     queryKey: ["/api/admin/reports", { status: 'pending' }],
-    enabled: !!user?.isAdmin && activeTab === 'reports',
+    enabled: !!user?.is_admin && activeTab === 'reports',
     queryFn: async ({ queryKey }) => {
       const [, params] = queryKey as [string, { status: string }];
       const response = await fetch(`/api/admin/reports?status=${params.status}`);
@@ -1167,8 +1166,8 @@ function UserManagementTab() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`px-2 py-1 rounded text-xs ${user.isAdmin ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                  {user.isAdmin ? 'Админ' : 'Пользователь'}
+                <span className={`px-2 py-1 rounded text-xs ${user.is_admin ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                  {user.is_admin ? 'Админ' : 'Пользователь'}
                 </span>
               </div>
             </div>
@@ -1186,70 +1185,227 @@ function ReleaseBrowserTab({ searchQuery, onSearchChange, showTestData }: {
   onSearchChange: (query: string) => void; 
   showTestData: boolean 
 }) {
-  const { data: releases = [] } = useQuery({
-    queryKey: ["/api/releases", { showTestData }],
+  const [filters, setFilters] = useState({
+    type: '',
+    artist: '',
+    sortBy: 'created_at',
+    sortOrder: 'desc' as 'asc' | 'desc',
+    page: 1,
+    limit: 50
+  });
+
+  const { data: releasesData, isLoading } = useQuery({
+    queryKey: ["/api/admin/releases", { 
+      ...filters, 
+      search: searchQuery, 
+      showTestData 
+    }],
     queryFn: async ({ queryKey }) => {
-      const [, params] = queryKey as [string, { showTestData: boolean }];
-      const response = await fetch(`/api/releases?showTestData=${params.showTestData}`);
+      const [, params] = queryKey as [string, any];
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== '' && value !== null) {
+          searchParams.append(key, value.toString());
+        }
+      });
+      
+      const response = await fetch(`/api/admin/releases?${searchParams}`);
       if (!response.ok) throw new Error('Failed to fetch releases');
       return response.json();
     },
   });
 
-  const filteredReleases = releases.filter((release: any) =>
-    release.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    release.artist?.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const releases = releasesData?.releases || [];
+  const total = releasesData?.total || 0;
+  const totalPages = releasesData?.totalPages || 0;
+
+  const handleFilterChange = (key: string, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setFilters(prev => ({ ...prev, page: newPage }));
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'album': return 'Альбом';
+      case 'single': return 'Сингл';
+      case 'compilation': return 'Сборник';
+      default: return type || 'Не указан';
+    }
+  };
 
   return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <List className="w-6 h-6 text-primary" />
-          <h3 className="text-xl font-semibold text-white">Все релизы ({filteredReleases.length})</h3>
-        </div>
+    <div className="space-y-6">
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <List className="w-6 h-6 text-primary" />
+            <h3 className="text-xl font-semibold text-white">Все релизы ({total})</h3>
+          </div>
 
-        <div className="mb-4">
-          <Input
-            placeholder="Поиск по названию или артисту..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="text-white"
-          />
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div>
+              <Label className="text-white text-sm">Поиск</Label>
+              <Input
+                placeholder="По названию или артисту..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="text-white"
+              />
+            </div>
+            
+            <div>
+              <Label className="text-white text-sm">Тип релиза</Label>
+              <select
+                value={filters.type}
+                onChange={(e) => handleFilterChange('type', e.target.value)}
+                className="w-full px-3 py-2 bg-muted text-white rounded-md border border-input"
+              >
+                <option value="">Все типы</option>
+                <option value="album">Альбом</option>
+                <option value="single">Сингл</option>
+                <option value="compilation">Сборник</option>
+              </select>
+            </div>
 
-        <div className="space-y-4 max-h-96 overflow-y-auto">
-          {filteredReleases.map((release: any) => (
-            <div
-              key={release.id}
-              className="flex items-center gap-4 p-4 border rounded hover:bg-muted/50"
-            >
-              {release.coverUrl ? (
-                <img
-                  src={release.coverUrl}
-                  alt={release.title}
-                  className="w-12 h-12 rounded object-cover"
-                />
-              ) : (
-                <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
-                  <Album className="w-6 h-6 text-muted-foreground" />
-                </div>
-              )}
-              <div className="flex-1">
-                <h4 className="font-medium text-white">{release.title}</h4>
-                <p className="text-sm text-white/70">{release.artist?.name}</p>
-                <p className="text-xs text-white/50">
-                  {release.releaseDate ? new Date(release.releaseDate).getFullYear() : 'Нет даты'}
-                </p>
-              </div>
-              <div className="text-sm text-white/70">
-                ⭐ {release.averageRating?.toFixed(1) || 'Нет оценок'}
+            <div>
+              <Label className="text-white text-sm">Артист</Label>
+              <Input
+                placeholder="Фильтр по артисту..."
+                value={filters.artist}
+                onChange={(e) => handleFilterChange('artist', e.target.value)}
+                className="text-white"
+              />
+            </div>
+
+            <div>
+              <Label className="text-white text-sm">Сортировка</Label>
+              <div className="flex gap-2">
+                <select
+                  value={filters.sortBy}
+                  onChange={(e) => handleFilterChange('sortBy', e.target.value)}
+                  className="flex-1 px-3 py-2 bg-muted text-white rounded-md border border-input"
+                >
+                  <option value="created_at">Дата добавления</option>
+                  <option value="title">Название</option>
+                  <option value="artist">Артист</option>
+                  <option value="release_date">Дата релиза</option>
+                  <option value="rating">Рейтинг</option>
+                </select>
+                <select
+                  value={filters.sortOrder}
+                  onChange={(e) => handleFilterChange('sortOrder', e.target.value)}
+                  className="px-3 py-2 bg-muted text-white rounded-md border border-input"
+                >
+                  <option value="desc">↓</option>
+                  <option value="asc">↑</option>
+                </select>
               </div>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Results */}
+      <Card>
+        <CardContent className="p-6">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <div className="w-6 h-6 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className="text-white/70 mt-2">Загрузка релизов...</p>
+            </div>
+          ) : releases.length === 0 ? (
+            <div className="text-center py-8 text-white/70">
+              Релизы не найдены
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {releases.map((release: any) => (
+                  <div
+                    key={release.id}
+                    className="flex items-center gap-4 p-4 border rounded hover:bg-muted/50"
+                  >
+                    {release.coverUrl ? (
+                      <img
+                        src={release.coverUrl}
+                        alt={release.title}
+                        className="w-12 h-12 rounded object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-muted rounded flex items-center justify-center">
+                        <Album className="w-6 h-6 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-medium text-white">{release.title}</h4>
+                        <span className="px-2 py-1 text-xs bg-primary/20 text-primary rounded">
+                          {getTypeLabel(release.type)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-white/70">{release.artist?.name}</p>
+                      <div className="flex items-center gap-4 text-xs text-white/50 mt-1">
+                        <span>
+                          {release.releaseDate ? new Date(release.releaseDate).getFullYear() : 'Нет даты'}
+                        </span>
+                        <span>⭐ {typeof release.averageRating === 'number' ? release.averageRating.toFixed(1) : 'Нет оценок'}</span>
+                        <span>💬 {release.commentCount || 0}</span>
+                        {release.isTestData && (
+                          <span className="text-yellow-400">🧪 Тест</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/release/${release.id}`, '_blank')}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                  <div className="text-sm text-white/70">
+                    Показано {((filters.page - 1) * filters.limit) + 1}-{Math.min(filters.page * filters.limit, total)} из {total}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(filters.page - 1)}
+                      disabled={filters.page <= 1}
+                    >
+                      ←
+                    </Button>
+                    <span className="text-sm text-white">
+                      {filters.page} / {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePageChange(filters.page + 1)}
+                      disabled={filters.page >= totalPages}
+                    >
+                      →
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -1257,10 +1413,12 @@ function ReleaseBrowserTab({ searchQuery, onSearchChange, showTestData }: {
 function CollectionsTab() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [newCollection, setNewCollection] = useState({ title: '', description: '', isPublic: true });
+  const [newCollection, setNewCollection] = useState({ title: '', description: '', is_public: true });
   const [editingCollection, setEditingCollection] = useState<any>(null);
   const [managingReleases, setManagingReleases] = useState<number | null>(null);
   const [releaseSearch, setReleaseSearch] = useState('');
+  const [selectedReleases, setSelectedReleases] = useState<number[]>([]);
+  const [showReleaseSelector, setShowReleaseSelector] = useState(false);
 
   const { data: collections = [] } = useQuery({
     queryKey: ["/api/admin/collections"],
@@ -1287,25 +1445,66 @@ function CollectionsTab() {
   ) : [];
 
   const createCollectionMutation = useMutation({
-    mutationFn: async (data: typeof newCollection) => {
-      const response = await apiRequest('POST', '/api/admin/collections', data);
-      return response.json();
+    mutationFn: async (data: typeof newCollection & { selectedReleases: number[] }) => {
+      // Сначала создаем подборку
+      const response = await apiRequest('POST', '/api/admin/collections', {
+        title: data.title,
+        description: data.description,
+        is_public: data.is_public,
+        is_active: data.selectedReleases.length >= 5, // Активируем только если есть минимум 5 релизов
+        sort_order: 0
+      });
+      const collection = await response.json();
+      
+      // Затем добавляем релизы
+      if (data.selectedReleases.length > 0) {
+        for (let i = 0; i < data.selectedReleases.length; i++) {
+          await apiRequest('POST', `/api/admin/collections/${collection.id}/releases`, {
+            releaseId: data.selectedReleases[i],
+            sortOrder: i + 1
+          });
+        }
+      }
+      
+      return collection;
     },
     onSuccess: () => {
-      toast({ title: "Подборка создана!" });
-      setNewCollection({ title: '', description: '', isPublic: true });
+      const message = selectedReleases.length >= 5 
+        ? "Подборка создана и активирована!" 
+        : "Подборка создана! Добавьте еще релизов для активации.";
+      toast({ title: message });
+      setNewCollection({ title: '', description: '', is_public: true });
+      setSelectedReleases([]);
+      setShowReleaseSelector(false);
       queryClient.invalidateQueries({ queryKey: ["/api/admin/collections"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Ошибка создания подборки", 
+        description: error.message || "Не удалось создать подборку",
+        variant: "destructive" 
+      });
     },
   });
 
   const deleteCollectionMutation = useMutation({
     mutationFn: async (id: number) => {
       const response = await apiRequest('DELETE', `/api/admin/collections/${id}`);
+      if (response.status === 204) {
+        return null; // No content
+      }
       return response.json();
     },
     onSuccess: () => {
       toast({ title: "Подборка удалена!" });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/collections"] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Ошибка удаления",
+        description: error.message || "Не удалось удалить подборку",
+        variant: "destructive"
+      });
     },
   });
 
@@ -1335,6 +1534,24 @@ function CollectionsTab() {
     },
   });
 
+  const updateCollectionMutation = useMutation({
+    mutationFn: async (data: { collectionId: number; updates: any }) => {
+      const response = await apiRequest('PUT', `/api/admin/collections/${data.collectionId}`, data.updates);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Подборка обновлена!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/collections"] });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Ошибка обновления", 
+        description: error.message || "Не удалось обновить подборку",
+        variant: "destructive" 
+      });
+    },
+  });
+
   return (
     <div className="space-y-6">
       {/* Create Collection */}
@@ -1352,7 +1569,7 @@ function CollectionsTab() {
                 toast({ title: "Введите название", variant: "destructive" });
                 return;
               }
-              createCollectionMutation.mutate(newCollection);
+              createCollectionMutation.mutate({ ...newCollection, selectedReleases });
             }}
             className="space-y-4"
           >
@@ -1374,6 +1591,92 @@ function CollectionsTab() {
                 className="text-white"
               />
             </div>
+            
+            {/* Release Selection */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label className="text-white">Релизы в подборке</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowReleaseSelector(!showReleaseSelector)}
+                >
+                  {showReleaseSelector ? 'Скрыть' : 'Выбрать релизы'} ({selectedReleases.length})
+                </Button>
+              </div>
+              
+              {selectedReleases.length > 0 && (
+                <div className="mb-2">
+                  <p className="text-sm text-white/70 mb-2">Выбранные релизы:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedReleases.map((releaseId) => {
+                      const release = allReleases.find((r: any) => r.id === releaseId);
+                      return release ? (
+                        <div key={releaseId} className="flex items-center gap-1 bg-blue-600 text-white px-2 py-1 rounded text-sm">
+                          <span>{release.artist?.name} - {release.title}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedReleases(prev => prev.filter(id => id !== releaseId))}
+                            className="ml-1 hover:bg-blue-700 rounded"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : null;
+                    })}
+                  </div>
+                </div>
+              )}
+              
+              {showReleaseSelector && (
+                <div className="border rounded p-4 bg-gray-800/50">
+                  <div className="mb-3">
+                    <Input
+                      placeholder="Поиск релизов..."
+                      value={releaseSearch}
+                      onChange={(e) => setReleaseSearch(e.target.value)}
+                      className="text-white"
+                    />
+                  </div>
+                  
+                  <div className="max-h-60 overflow-y-auto space-y-2">
+                    {filteredReleases.slice(0, 50).map((release: any) => (
+                      <div
+                        key={release.id}
+                        className={`flex items-center justify-between p-2 rounded cursor-pointer ${
+                          selectedReleases.includes(release.id) 
+                            ? 'bg-blue-600 text-white' 
+                            : 'bg-gray-700 hover:bg-gray-600 text-white'
+                        }`}
+                        onClick={() => {
+                          if (selectedReleases.includes(release.id)) {
+                            setSelectedReleases(prev => prev.filter(id => id !== release.id));
+                          } else {
+                            setSelectedReleases(prev => [...prev, release.id]);
+                          }
+                        }}
+                      >
+                        <div>
+                          <div className="font-medium">{release.title}</div>
+                          <div className="text-sm opacity-70">{release.artist?.name}</div>
+                        </div>
+                        <div className="text-sm">
+                          {selectedReleases.includes(release.id) ? '✓' : '+'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {selectedReleases.length < 5 && (
+                <p className="text-yellow-400 text-sm mt-2">
+                  ⚠️ Минимум 5 релизов для активации подборки (выбрано: {selectedReleases.length})
+                </p>
+              )}
+            </div>
+            
             <Button type="submit" disabled={createCollectionMutation.isPending}>
               {createCollectionMutation.isPending ? "Создаем..." : "Создать подборку"}
             </Button>
@@ -1401,7 +1704,10 @@ function CollectionsTab() {
                         <p className="text-sm text-white/70 mt-1">{collection.description}</p>
                       )}
                       <p className="text-xs text-white/50 mt-1">
-                        {collection.isPublic ? 'Публичная' : 'Приватная'} • {collection.releases?.length || 0} релизов
+                        {collection.is_public ? 'Публичная' : 'Приватная'} • {collection.releases?.length || 0} релизов • Порядок: {collection.sort_order || 0}
+                        {collection.releases?.length < 5 && (
+                          <span className="text-yellow-400 ml-2">⚠️ Минимум 5 релизов для активации</span>
+                        )}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -1412,6 +1718,44 @@ function CollectionsTab() {
                       >
                         <List className="w-4 h-4 mr-1" />
                         {collection.releases?.length || 0}
+                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateCollectionMutation.mutate({
+                            collectionId: collection.id,
+                            updates: { sort_order: (collection.sort_order || 0) - 1 }
+                          })}
+                          disabled={updateCollectionMutation.isPending}
+                        >
+                          ↑
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateCollectionMutation.mutate({
+                            collectionId: collection.id,
+                            updates: { sort_order: (collection.sort_order || 0) + 1 }
+                          })}
+                          disabled={updateCollectionMutation.isPending}
+                        >
+                          ↓
+                        </Button>
+                      </div>
+                      <Button
+                        variant={collection.is_active ? "default" : "secondary"}
+                        size="sm"
+                        onClick={() => {
+                          const newStatus = !collection.is_active;
+                          updateCollectionMutation.mutate({
+                            collectionId: collection.id,
+                            updates: { is_active: newStatus }
+                          });
+                        }}
+                        disabled={updateCollectionMutation.isPending || (collection.is_active && (collection.releases?.length || 0) < 5)}
+                      >
+                        {updateCollectionMutation.isPending ? "Обновляем..." : (collection.is_active ? "Активна" : "Активировать")}
                       </Button>
                       <Button
                         variant="destructive"
@@ -1608,6 +1952,7 @@ function PlaylistsTab() {
     setPlaylistForm({
       name: playlist.name,
       url: playlist.url,
+      platform: playlist.platform || 'mts',
       enabled: playlist.enabled,
       sortOrder: playlist.sortOrder
     });
@@ -1628,7 +1973,7 @@ function PlaylistsTab() {
 
   const handleCancelEdit = () => {
     setIsEditing(null);
-    setPlaylistForm({ name: '', url: '', enabled: true, sortOrder: 0 });
+    setPlaylistForm({ name: '', url: '', platform: 'mts', enabled: true, sortOrder: 0 });
   };
 
   return (

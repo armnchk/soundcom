@@ -20,7 +20,7 @@ if (!process.env.DATABASE_URL) {
 
 const getGoogleStrategy = memoize(
   () => {
-    const callbackURL = process.env.GOOGLE_CALLBACK_URL || "http://localhost:5000/api/callback";
+    const callbackURL = process.env.GOOGLE_CALLBACK_URL || "http://localhost:5001/api/callback";
     return new GoogleStrategy(
       {
         clientID: process.env.GOOGLE_CLIENT_ID!,
@@ -91,7 +91,32 @@ export async function setupAuth(app: Express) {
   passport.use(strategy);
 
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
-  passport.deserializeUser((user: Express.User, cb) => cb(null, user));
+  passport.deserializeUser(async (user: Express.User, cb) => {
+    try {
+      // Загружаем актуальные данные пользователя из базы данных
+      const freshUser = await storage.getUser(user.id);
+      if (freshUser) {
+        // Обновляем данные пользователя актуальными данными из БД
+        const updatedUser = {
+          ...user,
+          claims: {
+            ...user.claims,
+            first_name: freshUser.first_name,
+            last_name: freshUser.last_name,
+            email: freshUser.email,
+          },
+          nickname: freshUser.nickname,
+          is_admin: freshUser.is_admin,
+        };
+        cb(null, updatedUser);
+      } else {
+        cb(null, user);
+      }
+    } catch (error) {
+      console.error('Error deserializing user:', error);
+      cb(null, user);
+    }
+  });
 
   app.get("/api/login", (req, res, next) => {
     const scope = ["openid", "email", "profile"];

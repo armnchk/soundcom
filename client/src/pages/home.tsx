@@ -125,20 +125,50 @@ export default function Home() {
               {collections.map((collection) => (
                 <div key={collection.id}>
                   <div className="mb-6">
-                    <h2 className="text-3xl font-bold text-white mb-2">
-                      {collection.title}
-                    </h2>
-                    {(collection.subtitle || collection.description) && (
-                      <p className="text-white/70 text-lg">
-                        {collection.subtitle || collection.description}
-                      </p>
-                    )}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-3xl font-bold text-white mb-2">
+                          {collection.title}
+                        </h2>
+                        {(collection.subtitle || collection.description) && (
+                          <p className="text-white/70 text-lg">
+                            {collection.subtitle || collection.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-white/60">
+                        <span className="text-sm">
+                          {collection.releases.length} релизов
+                        </span>
+                        {collection.releases.length > 5 && (
+                          <div className="flex items-center gap-1">
+                            <ArrowRight className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Collection Releases - Horizontal Scroll */}
-                  <div className="relative">
-                    <div className="flex space-x-6 overflow-x-auto pb-4 scroll-smooth" style={{ scrollbarWidth: 'thin' }}>
-                      {collection.releases.slice(0, 5).map((release) => (
+                  <div className="relative group">
+                    {/* Left gradient shadow */}
+                    <div className="absolute left-0 top-0 bottom-0 w-12 bg-gradient-to-r from-background via-background/90 to-transparent z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    
+                    {/* Right gradient shadow */}
+                    <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-background via-background/90 to-transparent z-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    
+                    {/* Scroll container */}
+                    <div 
+                      className="flex space-x-6 overflow-x-auto pb-4 scroll-smooth scrollbar-hide" 
+                      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                      ref={(el) => {
+                        if (el) {
+                          el.style.scrollbarWidth = 'none';
+                          el.style.msOverflowStyle = 'none';
+                        }
+                      }}
+                    >
+                      {collection.releases.map((release) => (
                         <div
                           key={release.id}
                           className="flex-none w-52 cursor-pointer group"
@@ -174,18 +204,40 @@ export default function Home() {
                           </div>
                         </div>
                       ))}
-                      
-                      {collection.releases.length > 5 && (
-                        <div className="flex-none w-52 flex items-center justify-center">
-                          <div className="text-center text-muted-foreground">
-                            <ArrowRight className="w-8 h-8 mx-auto mb-3" />
-                            <p className="text-base font-medium">
-                              +{collection.releases.length - 5} more
-                            </p>
-                          </div>
-                        </div>
-                      )}
                     </div>
+                    
+                    {/* Navigation arrows - only show if more than 5 releases */}
+                    {collection.releases.length > 5 && (
+                      <>
+                        {/* Left arrow */}
+                        <button
+                          className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const container = e.currentTarget.parentElement?.querySelector('.flex.space-x-6');
+                            if (container) {
+                              container.scrollBy({ left: -300, behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          <ArrowRight className="w-5 h-5 rotate-180" />
+                        </button>
+                        
+                        {/* Right arrow */}
+                        <button
+                          className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            const container = e.currentTarget.parentElement?.querySelector('.flex.space-x-6');
+                            if (container) {
+                              container.scrollBy({ left: 300, behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          <ArrowRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

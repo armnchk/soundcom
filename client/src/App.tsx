@@ -3,6 +3,8 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { NicknameModal } from "@/components/modals/nickname-modal";
+import { useNicknameModal } from "@/hooks/useNicknameModal";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Release from "@/pages/release";
@@ -28,15 +30,28 @@ function Router() {
   );
 }
 
+function AppContent() {
+  const { showNicknameModal, closeModal, isRequired } = useNicknameModal();
+
+  return (
+    <TooltipProvider>
+      <div className="min-h-screen bg-background dark">
+        <Toaster />
+        <Router />
+        <NicknameModal 
+          open={showNicknameModal} 
+          onClose={closeModal}
+          isRequired={isRequired}
+        />
+      </div>
+    </TooltipProvider>
+  );
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <div className="min-h-screen bg-background dark">
-          <Toaster />
-          <Router />
-        </div>
-      </TooltipProvider>
+      <AppContent />
     </QueryClientProvider>
   );
 }

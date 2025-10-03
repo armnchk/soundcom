@@ -115,6 +115,7 @@ class DeezerAPIClient {
                 upc: albumDetail.upc,
                 label: albumDetail.label,
                 contributors: albumDetail.contributors || [],
+                tracks: albumDetail.tracks?.data || [],
                 source: 'deezer' as const
               };
             }
@@ -379,14 +380,14 @@ export class CombinedMusicAPI {
   private deezer = new DeezerAPIClient();
   private itunes = new ITunesAPIClient();
   
-  // Поиск артиста с fallback логикой
+  // Поиск артиста с приоритетом Deezer
   async findArtist(artistName: string): Promise<{
     artist: UnifiedArtist;
     albums: UnifiedAlbum[];
   } | null> {
     console.log(`🎵 Комбинированный поиск: "${artistName}"`);
     
-    // Сначала пробуем Deezer (лучше для российских артистов)
+    // Сначала пробуем Deezer (основной источник)
     let artist = await this.deezer.searchArtist(artistName);
     let albums: UnifiedAlbum[] = [];
     
@@ -403,7 +404,7 @@ export class CombinedMusicAPI {
       }
     }
     
-    // Fallback к iTunes API
+    // Fallback к iTunes API только если Deezer не дал результатов
     artist = await this.itunes.searchArtist(artistName);
     
     if (artist) {
@@ -421,6 +422,68 @@ export class CombinedMusicAPI {
     
     console.log(`❌ Артист "${artistName}" не найден ни в одном API`);
     return null;
+  }
+
+  // Поиск релизов в iTunes для уточнения дат (только для релизов без даты)
+  async findReleasesForDateUpdate(artistName: string, releasesWithoutDate: UnifiedAlbum[]): Promise<UnifiedAlbum[]> {
+    if (releasesWithoutDate.length === 0) {
+      return [];
+    }
+
+    console.log(`🍎 iTunes: Ищем даты для ${releasesWithoutDate.length} релизов без даты`);
+    
+    try {
+      // Ищем артиста в iTunes
+      const artist = await this.itunes.searchArtist(artistName);
+      if (!artist) {
+        console.log(`🍎 iTunes: Артист "${artistName}" не найден для уточнения дат`);
+        return [];
+      }
+
+      // Получаем все альбомы артиста из iTunes
+      const itunesAlbums = await this.itunes.getArtistAlbums(artist.id);
+      
+      // Сопоставляем релизы по названию (нормализованному)
+      const updatedReleases: UnifiedAlbum[] = [];
+      
+      for (const release of releasesWithoutDate) {
+        const normalizedTitle = this.normalizeTitle(release.title);
+        
+        // Ищем соответствующий релиз в iTunes
+        const matchingItunesAlbum = itunesAlbums.find(album => 
+          this.normalizeTitle(album.title) === normalizedTitle
+        );
+        
+        if (matchingItunesAlbum && matchingItunesAlbum.releaseDate) {
+          console.log(`🍎 iTunes: Найдена дата для "${release.title}": ${matchingItunesAlbum.releaseDate}`);
+          updatedReleases.push({
+            ...release,
+            releaseDate: matchingItunesAlbum.releaseDate
+          });
+        } else {
+          console.log(`🍎 iTunes: Дата не найдена для "${release.title}"`);
+          updatedReleases.push(release);
+        }
+      }
+      
+      return updatedReleases;
+      
+    } catch (error) {
+      console.error(`🍎 iTunes error при поиске дат:`, error);
+      return releasesWithoutDate;
+    }
+  }
+
+  // Нормализация названия для сопоставления
+  private normalizeTitle(title: string): string {
+    return title
+      .toLowerCase()
+      .replace(/\s*-\s*single\s*$/i, '')
+      .replace(/\s*-\s*ep\s*$/i, '')
+      .replace(/\s*-\s*album\s*$/i, '')
+      .replace(/\s*\(.*?\)\s*/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
   
   // Пакетный поиск артистов
