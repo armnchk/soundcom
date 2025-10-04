@@ -1,76 +1,105 @@
 import { useParams, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Music, ArrowLeft } from "lucide-react";
-import { useState } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ArrowLeft, Loader2, Settings, BarChart3, User as UserIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { User, Rating, Comment, Release, Artist } from "@shared/schema";
+import { apiRequest } from "@/lib/queryClient";
+import type { User } from "@shared/schema";
+import { ProfileSettings } from "@/components/profile/ProfileSettings";
+import { FilterOptions } from "@/components/profile/ProfileFilters";
+import { CombinedTab } from "@/components/profile/CombinedTab";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 export default function Profile() {
   const { id } = useParams<{ id?: string }>();
   const [, setLocation] = useLocation();
   const { user: currentUser, isAuthenticated, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'ratings' | 'reviews'>('ratings');
+  
+  const [activeTab, setActiveTab] = useState<'activity' | 'settings'>('activity');
+  const [filters, setFilters] = useState<FilterOptions>({
+    sortBy: 'newest',
+  });
 
   // Use current user's ID if no ID provided
-  const profileUserId = id || currentUser?.id;
+  const userId = id || currentUser?.id;
+  
+
+  // Fetch user data
+  const { data: user, isLoading: userLoading, error: userError } = useQuery<User>({
+    queryKey: ["/api/users", userId],
+    queryFn: async () => {
+      if (!userId) throw new Error("User ID is required");
+      const response = await apiRequest('GET', `/api/users/${userId}`);
+      return response.json();
+    },
+    enabled: !!userId && isAuthenticated,
+  });
+
+  // Fetch user stats
+  const { data: stats } = useQuery({
+    queryKey: ["/api/users", userId, "stats"],
+    queryFn: async () => {
+      if (!userId) throw new Error("User ID is required");
+      const response = await apiRequest('GET', `/api/users/${userId}/stats`);
+      return response.json();
+    },
+    enabled: !!userId && isAuthenticated,
+  });
+
+  const isOwnProfile = currentUser?.id === userId;
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated && !id) {
+      setLocation('/');
+    }
+    if (userError) {
       toast({
-        title: "Не авторизован",
-        description: "Вы вышли из системы. Выполняется вход...",
+        title: "Ошибка",
+        description: "Не удалось загрузить профиль пользователя.",
         variant: "destructive",
       });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
     }
-  }, [authLoading, isAuthenticated, toast]);
+  }, [isAuthenticated, authLoading, id, userError, setLocation, toast]);
 
-  const { data: user, isLoading } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    enabled: !!profileUserId && isAuthenticated,
-  });
-
-  const { data: userRatings = [] } = useQuery<(Rating & { release: Release & { artist: Artist } })[]>({
-    queryKey: ["/api/users", profileUserId, "ratings"],
-    enabled: !!profileUserId && activeTab === 'ratings',
-  });
-
-  const { data: userComments = [] } = useQuery<(Comment & { release: Release & { artist: Artist } })[]>({
-    queryKey: ["/api/users", profileUserId, "comments"],
-    enabled: !!profileUserId && activeTab === 'reviews',
-  });
-
-  if (authLoading || isLoading) {
+  if (authLoading || userLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
-          <div className="animate-pulse text-muted-foreground">Загрузка профиля...</div>
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="flex items-center space-x-2">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span>Загрузка профиля...</span>
+            </div>
+          </div>
         </div>
         <Footer />
       </div>
     );
   }
 
-  if (!user) {
+  if (userError || !user) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex items-center justify-center">
+        <div className="container mx-auto px-4 py-8">
           <Card>
-            <CardContent className="p-12 text-center">
-              <h1 className="text-2xl font-bold text-foreground mb-2">Пользователь не найден</h1>
-              <p className="text-muted-foreground">Профиль пользователя, который вы ищете, не существует.</p>
+            <CardContent className="p-8 text-center">
+              <h2 className="text-2xl font-bold text-foreground mb-4">Профиль не найден</h2>
+              <p className="text-muted-foreground mb-4">
+                Пользователь с таким ID не существует или у вас нет доступа к этому профилю.
+              </p>
+              <Button onClick={() => setLocation('/')} variant="outline">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Вернуться на главную
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -79,190 +108,65 @@ export default function Profile() {
     );
   }
 
-  const userInitials = user.nickname?.substring(0, 2).toUpperCase() || 
-                      user.firstName?.substring(0, 2).toUpperCase() || "U";
-
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card className="p-6 md:p-8">
-          {/* Profile Header */}
-          <div className="flex items-center space-x-6 mb-8">
-            <Avatar className="w-16 h-16">
-              {user.profileImageUrl && (
-                <AvatarImage src={user.profileImageUrl} alt={user.nickname || 'User'} />
-              )}
-              <AvatarFallback className="bg-primary text-primary-foreground text-xl font-bold">
-                {userInitials}
-              </AvatarFallback>
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <Button 
+            onClick={() => setLocation('/')} 
+            variant="ghost" 
+            size="sm"
+            className="mb-4"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Назад
+          </Button>
+        </div>
+
+        {/* User Info Header */}
+        <Card className="mb-6">
+          <CardContent className="p-6 flex flex-col md:flex-row items-center gap-6">
+            <Avatar className="h-24 w-24">
+              <AvatarImage src={user.profile_image_url || `https://api.dicebear.com/7.x/initials/svg?seed=${user.nickname || user.first_name}`} />
+              <AvatarFallback>{user.nickname ? user.nickname[0] : user.first_name ? user.first_name[0] : 'U'}</AvatarFallback>
             </Avatar>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground" data-testid="text-user-nickname">
-                {user.nickname || user.firstName || 'User'}
+            <div className="text-center md:text-left flex-1">
+              <h1 className="text-3xl font-bold text-foreground">
+                {user.nickname || user.first_name || "Пользователь"}
               </h1>
-              <p className="text-muted-foreground">
-                Присоединился {user.createdAt ? new Date(user.createdAt).toLocaleDateString('ru-RU', { 
-                  year: 'numeric', 
-                  month: 'long' 
-                }) : 'недавно'}
-              </p>
-              <div className="flex items-center space-x-4 mt-2">
-                <span className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground" data-testid="text-total-ratings">
-                    {userRatings.length}
-                  </span> Оценок
-                </span>
-                <span className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground" data-testid="text-total-comments">
-                    {userComments.length}
-                  </span> Отзывов
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Profile Tabs */}
-          <div className="border-b border-border mb-6">
-            <nav className="flex space-x-8">
-              <Button
-                variant="ghost"
-                className={`pb-2 border-b-2 font-medium text-sm ${
-                  activeTab === 'ratings' 
-                    ? 'border-primary text-primary' 
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => setActiveTab('ratings')}
-                data-testid="tab-ratings"
-              >
-                Recent Ratings
-              </Button>
-              <Button
-                variant="ghost"
-                className={`pb-2 border-b-2 font-medium text-sm ${
-                  activeTab === 'reviews' 
-                    ? 'border-primary text-primary' 
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => setActiveTab('reviews')}
-                data-testid="tab-reviews"
-              >
-                Отзывы
-              </Button>
-            </nav>
-          </div>
-
-          {/* Recent Ratings */}
-          {activeTab === 'ratings' && (
-            <div className="space-y-4">
-              {userRatings.map((rating: any) => (
-                <Card 
-                  key={rating.id}
-                  className="cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => setLocation(`/release/${rating.release.id}`)}
-                  data-testid={`rating-${rating.id}`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
-                        {rating.release.coverUrl ? (
-                          <img 
-                            src={rating.release.coverUrl} 
-                            alt={`${rating.release.title} cover`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center">
-                            <Music className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex-1">
-                        <h4 className="font-medium text-foreground text-sm">{rating.release.title}</h4>
-                        <p className="text-muted-foreground text-xs">{rating.release.artist.name}</p>
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium text-primary">{rating.score}/10</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(rating.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-
-              {userRatings.length === 0 && (
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <p className="text-muted-foreground">Оценок пока нет.</p>
-                  </CardContent>
-                </Card>
+              {stats && (
+                <div className="flex flex-wrap gap-4 mt-2 text-sm text-muted-foreground">
+                  <span>{stats.ratingsCount} оценок</span>
+                  <span>{stats.commentsCount} отзывов</span>
+                </div>
               )}
             </div>
-          )}
-
-          {/* Reviews */}
-          {activeTab === 'reviews' && (
-            <div className="space-y-4">
-              {userComments.map((comment: any) => (
-                <Card 
-                  key={comment.id}
-                  className="cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => setLocation(`/release/${comment.release.id}`)}
-                  data-testid={`comment-${comment.id}`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start space-x-4">
-                      <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0">
-                        {comment.release.coverUrl ? (
-                          <img 
-                            src={comment.release.coverUrl} 
-                            alt={`${comment.release.title} cover`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-muted flex items-center justify-center">
-                            <Music className="w-4 h-4 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="font-medium text-foreground text-sm">{comment.release.title}</h4>
-                          {comment.rating && (
-                            <span className="text-sm font-medium text-primary">{comment.rating}/10</span>
-                          )}
-                        </div>
-                        <p className="text-muted-foreground text-xs mb-2">{comment.release.artist.name}</p>
-                        {comment.text && (
-                          <p className="text-foreground text-sm leading-relaxed">{comment.text}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {new Date(comment.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-
-              {userComments.length === 0 && (
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <p className="text-muted-foreground">Отзывов пока нет.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
+          </CardContent>
         </Card>
-      </main>
 
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as any)} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="activity" className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4" />
+              Активность
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="flex items-center gap-2">
+              <UserIcon className="w-4 h-4" />
+              Настройки
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="activity">
+            <CombinedTab user={user} filters={filters} onFiltersChange={setFilters} />
+          </TabsContent>
+
+          <TabsContent value="settings">
+            <ProfileSettings user={user} isOwnProfile={isOwnProfile} />
+          </TabsContent>
+        </Tabs>
+      </div>
       <Footer />
     </div>
   );

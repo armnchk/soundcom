@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ThumbsUp, ThumbsDown, Flag, Edit, Trash2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { sanitizeText } from "@/lib/sanitize";
 
 interface CommentItemProps {
   comment: {
@@ -72,7 +73,7 @@ export function CommentItem({
           
           {comment.text && (
             <p className="text-foreground text-sm leading-relaxed mb-3" data-testid="comment-text">
-              {comment.text}
+              {sanitizeText(comment.text)}
             </p>
           )}
           

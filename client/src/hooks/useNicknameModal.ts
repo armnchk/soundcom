@@ -28,9 +28,14 @@ export function useNicknameModal() {
     }
   };
 
+  const openNicknameModal = () => {
+    setShowNicknameModal(true);
+  };
+
   return {
     showNicknameModal,
     closeModal,
+    openNicknameModal,
     isRequired: isAuthenticated && !isLoading && user && !user.nickname
   };
 }

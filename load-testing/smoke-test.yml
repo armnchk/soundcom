@@ -1,0 +1,38 @@
+# Smoke Test - быстрая проверка работоспособности
+config:
+  target: 'http://localhost:5000'
+  phases:
+    - duration: 30
+      arrivalRate: 2
+      name: "Smoke test"
+  
+  http:
+    timeout: 10
+  
+  ensure:
+    p95: 1000
+    maxErrorRate: 0.05
+
+scenarios:
+  - name: "Basic functionality check"
+    weight: 100
+    flow:
+      # Проверка главной страницы
+      - get:
+          url: "/"
+      
+      # Проверка API health
+      - get:
+          url: "/api/releases/health"
+      
+      # Проверка поиска
+      - get:
+          url: "/api/releases/search"
+          qs:
+            q: "test"
+      
+      # Проверка получения релизов
+      - get:
+          url: "/api/releases"
+          qs:
+            limit: 10

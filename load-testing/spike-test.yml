@@ -1,0 +1,56 @@
+# Spike Test - тест на резкие скачки нагрузки
+config:
+  target: 'http://localhost:5000'
+  phases:
+    # Нормальная нагрузка
+    - duration: 60
+      arrivalRate: 10
+      name: "Normal load"
+    
+    # Резкий скачок
+    - duration: 30
+      arrivalRate: 300
+      name: "Spike"
+    
+    # Возврат к нормальной нагрузке
+    - duration: 60
+      arrivalRate: 10
+      name: "Recovery"
+    
+    # Еще один скачок
+    - duration: 20
+      arrivalRate: 500
+      name: "Second spike"
+    
+    # Финальное остывание
+    - duration: 60
+      arrivalRate: 5
+      name: "Final cool down"
+  
+  http:
+    timeout: 30
+    pool: 50
+  
+  ensure:
+    p95: 10000
+    maxErrorRate: 0.3  # Допускаем ошибки при спайках
+
+scenarios:
+  - name: "Spike traffic"
+    weight: 100
+    flow:
+      - get:
+          url: "/"
+      
+      - get:
+          url: "/api/releases"
+          qs:
+            limit: 20
+      
+      - get:
+          url: "/api/releases/search"
+          qs:
+            q: "{{ $randomString() }}"
+      
+      - get:
+          url: "/api/collections"

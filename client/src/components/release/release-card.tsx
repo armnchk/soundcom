@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { StarRating } from "./rating-display";
 import { MessageCircle, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createSafeImageProps } from "@/lib/imageValidation";
 
 interface ReleaseCardProps {
   release: {
@@ -33,7 +34,7 @@ export function ReleaseCard({ release, onClick, className }: ReleaseCardProps) {
         <div className="aspect-square mb-3 overflow-hidden rounded-md">
           {release.coverUrl ? (
             <img 
-              src={release.coverUrl} 
+              {...createSafeImageProps(release.coverUrl, '/placeholder-album.png')}
               alt={`${release.title} cover`}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               data-testid="img-cover"

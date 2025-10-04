@@ -1,0 +1,85 @@
+# Stress Test - тест на максимальную нагрузку
+config:
+  target: 'http://localhost:5000'
+  phases:
+    # Постепенное увеличение нагрузки
+    - duration: 120
+      arrivalRate: 10
+      name: "Ramp up"
+    
+    # Максимальная нагрузка
+    - duration: 300
+      arrivalRate: 100
+      name: "Sustained high load"
+    
+    # Экстремальная нагрузка
+    - duration: 60
+      arrivalRate: 200
+      name: "Extreme load"
+    
+    # Остывание
+    - duration: 60
+      arrivalRate: 5
+      name: "Cool down"
+  
+  http:
+    timeout: 30
+    pool: 20
+  
+  ensure:
+    p95: 5000
+    p99: 10000
+    maxErrorRate: 0.2  # Допускаем больше ошибок при стрессе
+
+scenarios:
+  # Сценарий 1: Интенсивный просмотр
+  - name: "Intensive browsing"
+    weight: 40
+    flow:
+      - get:
+          url: "/"
+      
+      - get:
+          url: "/api/collections"
+      
+      - get:
+          url: "/api/releases"
+          qs:
+            limit: 50
+      
+      - get:
+          url: "/api/releases/{{ $randomInt(1, 100) }}"
+      
+      - get:
+          url: "/api/comments/releases/{{ $randomInt(1, 100) }}"
+
+  # Сценарий 2: Поисковая нагрузка
+  - name: "Search load"
+    weight: 30
+    flow:
+      - get:
+          url: "/api/releases/search"
+          qs:
+            q: "{{ $randomString() }}"
+      
+      - get:
+          url: "/api/artists/search"
+          qs:
+            q: "{{ $randomString() }}"
+
+  # Сценарий 3: API нагрузка
+  - name: "API stress"
+    weight: 30
+    flow:
+      - loop:
+          - get:
+              url: "/api/releases"
+              qs:
+                limit: 20
+                offset: "{{ $randomInt(0, 100) }}"
+          count: 10
+      
+      - loop:
+          - get:
+              url: "/api/artists"
+          count: 5

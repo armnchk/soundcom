@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { useState } from "react";
 import type { Release, Artist, Rating } from "@shared/schema";
+import { createSafeImageProps } from "@/lib/imageValidation";
 
 export default function Release() {
   const { id } = useParams<{ id: string }>();
@@ -85,7 +86,7 @@ export default function Release() {
                 <div className="aspect-square overflow-hidden rounded-xl max-w-[200px] mx-auto">
                   {release.coverUrl ? (
                     <img 
-                      src={release.coverUrl} 
+                      {...createSafeImageProps(release.coverUrl, '/placeholder-album.png')}
                       alt={`${release.title} cover`}
                       className="w-full h-full object-cover shadow-lg"
                       data-testid="img-release-cover"

@@ -35,9 +35,9 @@ export function CommentForm({
 
   // Check if user already has a comment for this release
   const { data: existingComments = [] } = useQuery({
-    queryKey: ["/api/releases", releaseId, "comments"],
+    queryKey: ["/api/comments/releases", releaseId],
     queryFn: async () => {
-      const response = await fetch(`/api/releases/${releaseId}/comments`);
+      const response = await fetch(`/api/comments/releases/${releaseId}`);
       if (!response.ok) throw new Error('Failed to fetch comments');
       return response.json();
     },
@@ -57,12 +57,12 @@ export function CommentForm({
         const commentId = initialData?.id || existingUserComment?.id;
         await apiRequest('PUT', `/api/comments/${commentId}`, data);
       } else {
-        await apiRequest('POST', `/api/releases/${releaseId}/comments`, data);
+        await apiRequest('POST', `/api/comments/releases/${releaseId}`, data);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId, "comments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId] });
+        // Force page refresh to ensure all data is updated
+        window.location.reload();
       
       if (mode === 'create' && !isEditing) {
         setText("");
@@ -140,15 +140,9 @@ export function CommentForm({
     });
   };
 
-  // Если есть существующий комментарий, показываем его вместо формы
-  console.log('CommentForm check:', { 
-    hasComment: !!existingUserComment, 
-    isEditing, 
-    commentId: existingUserComment?.id 
-  });
-  
-  if (existingUserComment && !isEditing) {
-    console.log('Showing comment block with icons');
+  // Если есть существующий комментарий и мы не в режиме редактирования, показываем его вместо формы
+  // Но только если mode !== 'edit' (чтобы избежать дублирования с CommentBlock)
+  if (existingUserComment && !isEditing && mode !== 'edit') {
     return (
       <div className="space-y-4">
         <div className="p-4 bg-muted rounded-lg border">

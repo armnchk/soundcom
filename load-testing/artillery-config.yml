@@ -1,0 +1,147 @@
+# Конфигурация нагрузочного тестирования для BudgetBuddy
+# Artillery.js конфигурация
+
+config:
+  target: 'http://localhost:5000'
+  phases:
+    # Фаза 1: Прогрев - постепенное увеличение нагрузки
+    - duration: 60
+      arrivalRate: 5
+      name: "Warmup phase"
+    
+    # Фаза 2: Нормальная нагрузка
+    - duration: 120
+      arrivalRate: 20
+      name: "Normal load"
+    
+    # Фаза 3: Пиковая нагрузка
+    - duration: 60
+      arrivalRate: 50
+      name: "Peak load"
+    
+    # Фаза 4: Спайк тест
+    - duration: 30
+      arrivalRate: 100
+      name: "Spike test"
+    
+    # Фаза 5: Остывание
+    - duration: 60
+      arrivalRate: 10
+      name: "Cool down"
+
+  # Настройки HTTP
+  http:
+    timeout: 30
+    pool: 10
+
+  # Настройки для обработки ошибок
+  ensure:
+    p95: 2000  # 95% запросов должны выполняться быстрее 2 секунд
+    p99: 5000  # 99% запросов должны выполняться быстрее 5 секунд
+    maxErrorRate: 0.1  # Максимум 10% ошибок
+
+  # Переменные окружения
+  variables:
+    baseUrl: "http://localhost:5000"
+    testUser: "test-user-{{ $randomString() }}"
+
+# Сценарии тестирования
+scenarios:
+  # Сценарий 1: Просмотр главной страницы
+  - name: "Homepage browsing"
+    weight: 30
+    flow:
+      - get:
+          url: "/"
+          capture:
+            - json: "$.csrfToken"
+              as: "csrfToken"
+      
+      # Получение коллекций
+      - get:
+          url: "/api/collections"
+          qs:
+            activeOnly: true
+      
+      # Поиск релизов
+      - get:
+          url: "/api/releases/search"
+          qs:
+            q: "{{ $randomString() }}"
+            sortBy: "rating_desc"
+
+  # Сценарий 2: Просмотр релиза
+  - name: "Release viewing"
+    weight: 25
+    flow:
+      - get:
+          url: "/api/releases"
+          qs:
+            limit: 20
+      
+      # Получаем ID релиза из ответа
+      - get:
+          url: "/api/releases/{{ $randomInt(1, 100) }}"
+      
+      # Получаем треки релиза
+      - get:
+          url: "/api/releases/{{ $randomInt(1, 100) }}/tracks"
+      
+      # Получаем комментарии
+      - get:
+          url: "/api/comments/releases/{{ $randomInt(1, 100) }}"
+      
+      # Получаем рейтинги
+      - get:
+          url: "/api/ratings/releases/{{ $randomInt(1, 100) }}"
+
+  # Сценарий 3: Аутентификация (симуляция)
+  - name: "Authentication flow"
+    weight: 15
+    flow:
+      # Получение CSRF токена
+      - get:
+          url: "/api/csrf-token"
+          capture:
+            - json: "$.token"
+              as: "csrfToken"
+      
+      # Попытка входа (будет редирект на Google)
+      - get:
+          url: "/api/login"
+          expect:
+            - statusCode: 302
+
+  # Сценарий 4: API нагрузка (без аутентификации)
+  - name: "API load test"
+    weight: 20
+    flow:
+      # Поиск исполнителей
+      - get:
+          url: "/api/artists/search"
+          qs:
+            q: "{{ $randomString() }}"
+      
+      # Получение всех исполнителей
+      - get:
+          url: "/api/artists"
+      
+      # Получение релизов с фильтрами
+      - get:
+          url: "/api/releases"
+          qs:
+            genre: "{{ $pick(['rock', 'pop', 'jazz', 'classical']) }}"
+            year: "{{ $randomInt(2020, 2024) }}"
+            limit: 50
+
+  # Сценарий 5: Тестирование Rate Limiting
+  - name: "Rate limit testing"
+    weight: 10
+    flow:
+      # Быстрые запросы для тестирования лимитов
+      - loop:
+          - get:
+              url: "/api/search"
+              qs:
+                q: "test-{{ $randomString() }}"
+          count: 35  # Превышаем лимит в 30 запросов/минуту

@@ -51,6 +51,7 @@ export interface IStorage {
   
   // Release operations
   getReleases(filters?: { genre?: string; year?: number; artistId?: number }): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number })[]>;
+  getReleasesByArtist(artistId: number): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number })[]>;
   getRelease(id: number): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number }) | undefined>;
   getReleaseByTitleAndArtist(title: string, artist_id: number): Promise<Release | undefined>;
   getReleaseTracks(releaseId: number): Promise<any[]>;
@@ -75,6 +76,8 @@ export interface IStorage {
   createComment(comment: InsertComment): Promise<Comment>;
   updateComment(id: number, comment: Partial<InsertComment>): Promise<Comment>;
   deleteComment(id: number): Promise<void>;
+  getCommentById(id: number): Promise<Comment | null>;
+  getUserCommentForRelease(user_id: string, release_id: number): Promise<Comment | null>;
   
   // Comment reaction operations
   upsertCommentReaction(reaction: InsertCommentReaction): Promise<CommentReaction>;
@@ -223,12 +226,11 @@ export class DatabaseStorage implements IStorage {
           name: artists.name,
           createdAt: artists.created_at,
         },
-        averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`,
+        averageRating: sql<number>`COALESCE(ROUND(AVG(CASE WHEN ${comments.rating} IS NOT NULL THEN ${comments.rating} END), 1), 0)`,
         commentCount: sql<number>`COUNT(DISTINCT ${comments.id})`,
       })
       .from(releases)
       .leftJoin(artists, eq(releases.artist_id, artists.id))
-      .leftJoin(ratings, eq(releases.id, ratings.release_id))
       .leftJoin(comments, eq(releases.id, comments.release_id))
       .groupBy(releases.id, artists.id);
 
@@ -237,6 +239,38 @@ export class DatabaseStorage implements IStorage {
     }
 
     const result = await query.orderBy(desc(releases.created_at));
+    return result as any;
+  }
+
+  async getReleasesByArtist(artistId: number): Promise<(Release & { artist: Artist; averageRating: number; commentCount: number })[]> {
+    const result = await db
+      .select({
+        id: releases.id,
+        artistId: releases.artist_id,
+        title: releases.title,
+        releaseDate: sql`${releases.release_date}`,
+        coverUrl: releases.cover_url,
+        streamingLinks: releases.streaming_links,
+        isTestData: releases.is_test_data,
+        createdAt: releases.created_at,
+        artist: {
+          id: artists.id,
+          name: artists.name,
+          createdAt: artists.created_at,
+        },
+        averageRating: sql<number>`COALESCE(ROUND(AVG(CASE WHEN ${comments.rating} IS NOT NULL THEN ${comments.rating} END), 1), 0)`,
+        commentCount: sql<number>`COUNT(DISTINCT ${comments.id})`,
+      })
+      .from(releases)
+      .leftJoin(artists, eq(releases.artist_id, artists.id))
+      .leftJoin(comments, eq(releases.id, comments.release_id))
+      .where(and(
+        eq(releases.artist_id, artistId),
+        eq(releases.is_test_data, false)
+      ))
+      .groupBy(releases.id, artists.id)
+      .orderBy(desc(releases.created_at));
+
     return result as any;
   }
 
@@ -310,12 +344,11 @@ export class DatabaseStorage implements IStorage {
           name: artists.name,
           createdAt: artists.created_at,
         },
-        averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`,
+        averageRating: sql<number>`COALESCE(ROUND(AVG(CASE WHEN ${comments.rating} IS NOT NULL THEN ${comments.rating} END), 1), 0)`,
         commentCount: sql<number>`COUNT(DISTINCT ${comments.id})`,
       })
       .from(releases)
       .leftJoin(artists, eq(releases.artist_id, artists.id))
-      .leftJoin(ratings, eq(releases.id, ratings.release_id))
       .leftJoin(comments, eq(releases.id, comments.release_id))
       .groupBy(releases.id, artists.id)
       .where(whereClause);
@@ -368,12 +401,11 @@ export class DatabaseStorage implements IStorage {
           name: artists.name,
           createdAt: artists.created_at,
         },
-        averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`,
+        averageRating: sql<number>`COALESCE(ROUND(AVG(CASE WHEN ${comments.rating} IS NOT NULL THEN ${comments.rating} END), 1), 0)`,
         commentCount: sql<number>`COUNT(DISTINCT ${comments.id})`,
       })
       .from(releases)
       .leftJoin(artists, eq(releases.artist_id, artists.id))
-      .leftJoin(ratings, eq(releases.id, ratings.release_id))
       .leftJoin(comments, eq(releases.id, comments.release_id))
       .where(eq(releases.id, id))
       .groupBy(releases.id, artists.id);
@@ -412,7 +444,7 @@ export class DatabaseStorage implements IStorage {
     const ratingsSubquery = db
       .select({
         release_id: ratings.release_id,
-        averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`.as('averageRating')
+        averageRating: sql<number>`COALESCE(ROUND(AVG(${ratings.score}), 1), 0)`.as('averageRating')
       })
       .from(ratings)
       .groupBy(ratings.release_id)
@@ -515,13 +547,19 @@ export class DatabaseStorage implements IStorage {
   async getReleaseRatings(release_id: number): Promise<{ averageRating: number; count: number }> {
     const [result] = await db
       .select({
-        averageRating: sql<number>`COALESCE(AVG(${ratings.score}), 0)`,
+        averageRating: sql<number>`COALESCE(ROUND(AVG(${comments.rating}), 1), 0)`,
         count: sql<number>`COUNT(*)`,
       })
-      .from(ratings)
-      .where(eq(ratings.release_id, release_id));
+      .from(comments)
+      .where(and(
+        eq(comments.release_id, release_id),
+        ne(comments.rating, null)
+      ));
 
-    return result || { averageRating: 0, count: 0 };
+    return {
+      averageRating: Number(result?.averageRating) || 0,
+      count: Number(result?.count) || 0
+    };
   }
 
   // Comment operations
@@ -529,24 +567,40 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log('Getting comments for release_id:', release_id);
       
-      // Very simple query first - just get comments
+      // Get comments with user information and reaction counts
       const result = await db
-        .select()
+        .select({
+          id: comments.id,
+          user_id: comments.user_id,
+          release_id: comments.release_id,
+          content: comments.content,
+          rating: comments.rating,
+          parent_id: comments.parent_id,
+          created_at: comments.created_at,
+          updated_at: comments.updated_at,
+          user: {
+            id: users.id,
+            nickname: users.nickname,
+            profile_image_url: users.profile_image_url,
+          },
+          likeCount: sql<number>`COALESCE(SUM(CASE WHEN ${commentReactions.reaction_type} = 'like' THEN 1 ELSE 0 END), 0)`,
+          dislikeCount: sql<number>`COALESCE(SUM(CASE WHEN ${commentReactions.reaction_type} = 'dislike' THEN 1 ELSE 0 END), 0)`,
+        })
         .from(comments)
+        .leftJoin(users, eq(comments.user_id, users.id))
+        .leftJoin(commentReactions, eq(comments.id, commentReactions.comment_id))
         .where(eq(comments.release_id, release_id))
+        .groupBy(comments.id, users.id)
         .orderBy(desc(comments.created_at));
 
       console.log('Comments query result:', result.length, 'comments found');
 
-      // Add like/dislike counts as 0 for now and user info as null
+      // Map to expected format
       const commentsWithCounts = result.map(comment => ({
         ...comment,
         text: comment.content, // Map content to text for compatibility
-        rating: comment.rating, // Use actual rating from database
         is_anonymous: false, // No anonymous flag in current schema
-        user: null,
-        likeCount: 0,
-        dislikeCount: 0,
+        user: comment.user?.id ? comment.user : null, // Only include user if exists
       }));
 
       return commentsWithCounts;
@@ -647,6 +701,24 @@ export class DatabaseStorage implements IStorage {
     } as Comment;
   }
 
+  async getCommentById(id: number): Promise<Comment | null> {
+    const [result] = await db
+      .select()
+      .from(comments)
+      .where(eq(comments.id, id))
+      .limit(1);
+    
+    if (!result) return null;
+    
+    // Map back to expected format
+    return {
+      ...result,
+      text: result.content,
+      rating: result.rating,
+      is_anonymous: false,
+    } as Comment;
+  }
+
   // Comment reaction operations
   async upsertCommentReaction(reaction: InsertCommentReaction): Promise<CommentReaction> {
     const [result] = await db
@@ -722,12 +794,12 @@ export class DatabaseStorage implements IStorage {
   async getUserRatings(user_id: string): Promise<(Rating & { release: Release & { artist: Artist } })[]> {
     const result = await db
       .select({
-        id: ratings.id,
-        user_id: ratings.user_id,
-        release_id: ratings.release_id,
-        score: ratings.score,
-        createdAt: ratings.created_at,
-        updatedAt: ratings.updated_at,
+        id: comments.id,
+        user_id: comments.user_id,
+        release_id: comments.release_id,
+        score: comments.rating,
+        createdAt: comments.created_at,
+        updatedAt: comments.updated_at,
         release: {
           id: releases.id,
           artistId: releases.artist_id,
@@ -745,11 +817,14 @@ export class DatabaseStorage implements IStorage {
           createdAt: artists.created_at,
         },
       })
-      .from(ratings)
-      .leftJoin(releases, eq(ratings.release_id, releases.id))
+      .from(comments)
+      .leftJoin(releases, eq(comments.release_id, releases.id))
       .leftJoin(artists, eq(releases.artist_id, artists.id))
-      .where(eq(ratings.user_id, user_id))
-      .orderBy(desc(ratings.created_at));
+      .where(and(
+        eq(comments.user_id, user_id),
+        sql`${comments.rating} IS NOT NULL`
+      ))
+      .orderBy(desc(comments.created_at));
 
     return result as any;
   }

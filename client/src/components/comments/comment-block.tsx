@@ -1,10 +1,10 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { CommentItem } from "./comment-item";
 import { CommentForm } from "./comment-form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,27 +18,55 @@ interface CommentBlockProps {
 export function CommentBlock({ releaseId, isAuthenticated, currentUserId }: CommentBlockProps) {
   const [sortBy, setSortBy] = useState<'date' | 'rating' | 'likes'>('date');
   const [isEditing, setIsEditing] = useState(false);
+  const [localComments, setLocalComments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: comments = [], isLoading } = useQuery({
-    queryKey: ["/api/releases", releaseId, "comments", { sortBy }],
-    queryFn: async ({ queryKey }) => {
-      const [, releaseId, , params] = queryKey as [string, number, string, { sortBy: string }];
-      const response = await fetch(`/api/releases/${releaseId}/comments?sortBy=${params.sortBy}`);
-      if (!response.ok) throw new Error('Failed to fetch comments');
-      return response.json();
-    },
-  });
+  // Debounced function to load comments
+  const loadComments = useCallback(async (releaseId: number, sortBy: string) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`/api/comments/releases/${releaseId}?sortBy=${sortBy}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      setLocalComments(data);
+    } catch (err) {
+      console.error('Error loading comments:', err);
+      // Don't clear existing comments on error
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Load comments when component mounts or sortBy changes
+  useEffect(() => {
+    if (releaseId) {
+      const timeoutId = setTimeout(() => {
+        loadComments(releaseId, sortBy);
+      }, 300); // 300ms debounce
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [releaseId, sortBy, loadComments]);
+
+  // Use local comments state
+  const comments = localComments;
 
   const deleteCommentMutation = useMutation({
     mutationFn: async (commentId: number) => {
       await apiRequest('DELETE', `/api/comments/${commentId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId, "comments"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/releases", releaseId] });
+      // Refresh comments after deletion
+      loadComments(releaseId, sortBy);
+      
+        // Force page refresh to ensure all data is updated
+        window.location.reload();
+      
       toast({
         title: "Оценка удалена",
         description: "Ваша оценка успешно удалена",

@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Music, FolderOpen, ArrowRight, Search } from "lucide-react";
 import { useState } from "react";
+import { useCollections } from "../hooks/useCollections";
+import { createSafeImageProps } from "@/lib/imageValidation";
 
 interface ReleaseWithDetails {
   id: number;
@@ -32,14 +34,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Fetch featured collections
-  const { data: collections = [], isLoading: collectionsLoading } = useQuery<Collection[]>({
-    queryKey: ["/api/collections"],
-    queryFn: async () => {
-      const response = await fetch('/api/collections?activeOnly=true');
-      if (!response.ok) throw new Error('Failed to fetch collections');
-      return response.json();
-    },
-  });
+  const { data: collections = [], isLoading: collectionsLoading } = useCollections(true);
 
   const handleReleaseClick = (releaseId: number) => {
     setLocation(`/release/${releaseId}`);
@@ -178,7 +173,7 @@ export default function Home() {
                           <div className="w-52 h-52 rounded-xl overflow-hidden mb-4 bg-muted shadow-lg group-hover:shadow-xl transition-all duration-300">
                             {release.coverUrl ? (
                               <img 
-                                src={release.coverUrl} 
+                                {...createSafeImageProps(release.coverUrl, '/placeholder-album.png')}
                                 alt={`${release.title} cover`}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                               />

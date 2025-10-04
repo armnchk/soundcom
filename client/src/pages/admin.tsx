@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { createSafeImageProps } from "@/lib/imageValidation";
 
 export default function Admin() {
   const { user, isLoading: authLoading } = useAuth();
@@ -1331,7 +1332,7 @@ function ReleaseBrowserTab({ searchQuery, onSearchChange, showTestData }: {
                   >
                     {release.coverUrl ? (
                       <img
-                        src={release.coverUrl}
+                        {...createSafeImageProps(release.coverUrl, '/placeholder-album.png')}
                         alt={release.title}
                         className="w-12 h-12 rounded object-cover"
                       />

@@ -25,8 +25,12 @@ export function NicknameModal({ open, onClose, isRequired = false }: NicknameMod
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // Инвалидируем все запросы пользователей, чтобы обновились данные на странице профиля
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       onClose();
-      toast({ title: "Добро пожаловать в RevYou!" });
+      toast({ 
+        title: isRequired ? "Добро пожаловать в RevYou!" : "Никнейм успешно изменен!" 
+      });
     },
     onError: (error) => {
       toast({ 
@@ -102,12 +106,12 @@ export function NicknameModal({ open, onClose, isRequired = false }: NicknameMod
             <Music className="w-8 h-8 text-primary-foreground" />
           </div>
           <DialogTitle className="text-center text-2xl font-bold">
-            {isRequired ? "Выберите никнейм" : "Choose Your Nickname"}
+            {isRequired ? "Выберите никнейм" : "Изменить никнейм"}
           </DialogTitle>
           <p className="text-center text-muted-foreground text-sm">
             {isRequired 
               ? "Никнейм обязателен для использования сайта. Это будет ваше отображаемое имя в сообществе."
-              : "This will be your display name in the community"
+              : "Это будет ваше отображаемое имя в сообществе"
             }
           </p>
           {isRequired && (
@@ -153,7 +157,10 @@ export function NicknameModal({ open, onClose, isRequired = false }: NicknameMod
             className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
             data-testid="button-complete"
           >
-            {nicknameMutation.isPending ? "Настраиваем..." : (isRequired ? "Завершить регистрацию" : "Complete Registration")}
+            {nicknameMutation.isPending 
+              ? "Сохраняем..." 
+              : (isRequired ? "Завершить регистрацию" : "Сохранить")
+            }
           </Button>
         </form>
       </DialogContent>
